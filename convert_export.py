@@ -1,5 +1,6 @@
 import argparse
 import json
+import os.path
 from pathlib import Path
 
 test_text = [
@@ -115,6 +116,34 @@ def convert_msg(d: dict) -> dict:
     reply_id = d.get("reply_to_message_id")
     reply = id_map.get(reply_id)
 
+    def parse_file() -> dict | None:
+        file = d.get("file")
+        if file is None:
+            return None
+        return {
+            "url": file,
+            "thumb": d.get("thumbnail"),
+            "mime_type": d.get("mime_type"),
+            "size": os.path.getsize(p / file),
+
+            # Media
+            "media_type": d.get("media_type"),
+
+            # Video/audio/gif
+            "duration": d.get("duration_seconds"),
+
+            # Video/sticker/gif
+            "width": d.get("width"),
+            "height": d.get("height"),
+
+            # Sticker
+            "sticker_emoji": d.get("sticker_emoji"),
+
+            # Audio
+            "title": d.get("title"),
+            "performer": d.get("performer")
+        }
+
     msg = {
         "id": d["id"],
         "date": d["date"],
@@ -124,19 +153,19 @@ def convert_msg(d: dict) -> dict:
         "images": None if d.get("photo") is None else [
             {"url": d.get("photo"), "width": d.get("width"), "height": d.get("height")}
         ],
-        # TODO: Add this in front end
         "forwarded_from": d.get("forwarded_from"),
 
         # TODO: Add this in front end
         "video": None if d.get("media_type") != "video_file" else {
             "thumb": d.get("thumbnail"), "duration": d.get("duration_seconds"), "src": d.get("file")
         },
-        # TODO: Add this in front end
         "reply": None if reply_id is None else {
             "id": reply_id,
             "text": plain_text(reply.get("text")),
             "thumb": reply.get("thumbnail") or reply.get("photo"),
-        }
+        },
+        "author": d.get("author"),
+        "file": parse_file()
         # TODO: Add more fields
     }
 
