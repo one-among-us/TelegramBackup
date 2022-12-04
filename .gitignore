@@ -152,3 +152,4 @@ cython_debug/
 .idea/
 Bot.session
 Bot.session-journal
+node_modules

@@ -2,7 +2,10 @@ import argparse
 import json
 import os.path
 import urllib.parse
+import zlib
 from pathlib import Path
+from subprocess import check_output
+from zipfile import ZipFile
 
 import lottie_convert
 
@@ -128,11 +131,18 @@ def convert_msg(d: dict) -> dict:
         if path is None:
             return None
 
-        # Convert tgs stickers to webm
+        # Convert tgs stickers to apng
         if path.endswith(".tgs"):
-            webm = path[:-len(".tgs")] + ".webm"
-            lottie_convert.run([str(p / path), str(p / webm)])
-            path = webm
+            # Decompress to json
+            json = path + ".json"
+            (p / json).write_bytes(zlib.decompress((p / path).read_bytes(), 15 + 32))
+
+            # Convert json to apng
+            out = path[:-len(".tgs")] + ".apng"
+            check_output(['./node_modules/.bin/puppeteer-lottie', '-i', p / json, '-o', p / out])
+
+            # Use apng instead
+            path = out
 
         url = urllib.parse.quote(path)
         if url == path:
