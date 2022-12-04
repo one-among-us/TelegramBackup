@@ -14,7 +14,7 @@ test_text = [
 ]
 
 
-def convert_text(text: str | list[dict | str]) -> str:
+def convert_text(text: str | list[dict | str] | None) -> str | None:
     """
     Convert text to markdown/html
 
@@ -24,6 +24,9 @@ def convert_text(text: str | list[dict | str]) -> str:
     :param text: Telegram text
     :return: Markdown text
     """
+    if text is None:
+        return None
+
     if isinstance(text, str):
         return text
 
@@ -34,33 +37,40 @@ def convert_text(text: str | list[dict | str]) -> str:
             t = e["text"]
             match e["type"]:
                 case "strikethrough":
-                    return f"~~{t}~~"
+                    return f"<strike>{t}</strike>"
                 case "code":
-                    return f"`{t}`"
+                    return f"<code>{t}</code>"
                 case "italic":
-                    return f"__{t}__"
-                # case "underline":
-                    # return f"__{text}__"
+                    return f"<em>{t}</em>"
+                case "underline":
+                    return f"<u>{text}</u>"
                 case "bold":
-                    return f"**{t}**"
+                    return f"<b>{t}</b>"
                 case "spoiler":
-                    return f"||{t}||"
+                    return f'<span class="spoiler"><span>{t}</span></span>'
+                # case "link":
+                    # return f'<a href="{t}">{t}</a>'
+                case "hashtag":
+                    return f'<a href="{t}">{t}</a>'
+                case "mention":
+                    url = f'https://t.me/{t.strip("@")}'
+                    return f'<a href="{url}">{t}</a>'
                 case _:
                     return t
 
     text = [[e, convert_entity(e)] for e in text]
 
     # Add spaces in between markdown elements and regular text
-    for i, tup in enumerate(text):
-        e, t = tup
-        if isinstance(e, str):
-            continue
-
-        if not t.startswith(" ") and i > 0 and not text[i - 1][1].endswith(" "):
-            t = " " + t
-        if not t.endswith(" ") and i < len(text) - 1 and not text[i + 1][1].startswith(" "):
-            t = t + " "
-        text[i][1] = t
+    # for i, tup in enumerate(text):
+    #     e, t = tup
+    #     if isinstance(e, str):
+    #         continue
+    #
+    #     if not t.startswith(" ") and i > 0 and not text[i - 1][1].endswith(" "):
+    #         t = " " + t
+    #     if not t.endswith(" ") and i < len(text) - 1 and not text[i + 1][1].startswith(" "):
+    #         t = t + " "
+    #     text[i][1] = t
 
     return "".join([t[1] for t in text])
 
@@ -76,7 +86,7 @@ def convert_msg(d: dict) -> dict:
         "id": d["id"],
         "date": d["date"],
         "type": None if d.get("type") == "message" else d.get("type"),
-        "text": d.get("text")
+        "text": convert_text(d.get("text"))
         # TODO: Add more fields
         # TODO: Convert photo message
     }
@@ -100,5 +110,5 @@ if __name__ == '__main__':
     # Convert
     j = [convert_msg(d) for d in j]
 
-    (p / "posts.json").write_text(json.dumps(j))
+    (p / "posts.json").write_text(json.dumps(j, indent=2, ensure_ascii=False))
 
