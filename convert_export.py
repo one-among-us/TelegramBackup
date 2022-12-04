@@ -5,9 +5,6 @@ import urllib.parse
 import zlib
 from pathlib import Path
 from subprocess import check_output
-from zipfile import ZipFile
-
-import lottie_convert
 
 test_text = [
     "test ",
