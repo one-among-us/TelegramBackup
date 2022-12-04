@@ -4,4 +4,3 @@ ruamel.yaml
 tgcrypto
 uvloop
 hypy_utils
-lottie[all]
