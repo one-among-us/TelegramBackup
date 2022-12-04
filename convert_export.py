@@ -42,7 +42,7 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
                 case "italic":
                     return f"<em>{t}</em>"
                 case "underline":
-                    return f"<u>{text}</u>"
+                    return f"<u>{t}</u>"
                 case "bold":
                     return f"<b>{t}</b>"
                 case "spoiler":
@@ -52,6 +52,9 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
                 # case "mention_name":
                 #     id = e['user_id']
                 #     return f'<a href="https://t.me/{id}">{t}</a>'
+                case "text_link":
+                    url = e['href']
+                    return f'<a href="{url}">{t}</a>'
                 case "hashtag":
                     return f'<a href="{t}">{t}</a>'
                 case "mention":
