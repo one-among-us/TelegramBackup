@@ -85,8 +85,7 @@ def convert_msg(d: dict) -> dict:
             {"url": d.get("photo"), "width": d.get("width"), "height": d.get("height")}
         ],
         # TODO: Add this in front end
-        "forwarded_From": None if d.get("forwarded_from") is None else [
-            f'<b>forwarded from: {d.get("forwarded_from")}</b>'],
+        "forwarded_from": d.get("forwarded_from"),
 
         # TODO: Add this in front end
         "video": None if d.get("media_type") != "video_file" else {
