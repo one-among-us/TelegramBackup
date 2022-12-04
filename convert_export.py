@@ -4,6 +4,8 @@ import os.path
 import urllib.parse
 from pathlib import Path
 
+import lottie_convert
+
 test_text = [
     "test ",
     {"type": "strikethrough", "text": "strikethrough"},
@@ -125,6 +127,12 @@ def convert_msg(d: dict) -> dict:
         """
         if path is None:
             return None
+
+        # Convert tgs stickers to webm
+        if path.endswith(".tgs"):
+            webm = path[:-len(".tgs")] + ".webm"
+            lottie_convert.run([str(p / path), str(p / webm)])
+            path = webm
 
         url = urllib.parse.quote(path)
         if url == path:
