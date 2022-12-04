@@ -68,6 +68,20 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
     return "".join([t[1] for t in text])
 
 
+def remove_nones(d: dict) -> dict:
+    """
+    Recursively remove none values from a dict
+
+    >>> remove_nones({'a': {'b': None, 'c': 1}, 'b': None, 'c': {'a': None}})
+    {'a': {'c': 1}, 'c': {}}
+
+    :param d: Dict
+    :return: Dict without nones
+    """
+    return {k: remove_nones(v) if isinstance(v, dict) else v
+            for k, v in d.items() if v is not None}
+
+
 def convert_msg(d: dict) -> dict:
     """
     Convert a message object
@@ -100,7 +114,7 @@ def convert_msg(d: dict) -> dict:
         # TODO: Add more fields
     }
 
-    return {k: v for k, v in msg.items() if v is not None}
+    return remove_nones(msg)
 
 
 def get_topic_content(id: int, type: str) -> str | None:
