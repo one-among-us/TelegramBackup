@@ -1,6 +1,7 @@
 import argparse
 import json
 import os.path
+import urllib.parse
 from pathlib import Path
 
 test_text = [
@@ -116,13 +117,29 @@ def convert_msg(d: dict) -> dict:
     reply_id = d.get("reply_to_message_id")
     reply = id_map.get(reply_id)
 
-    def parse_file() -> dict | None:
+    def process_file_path(path: str | None) -> str | None:
+        """
+        Ensure file paths are url-safe
+        """
+        if path is None:
+            return None
+
+        url = urllib.parse.quote(path)
+        if url == path:
+            return path
+
+        # Move file
+        if not os.path.islink(p / url):
+            os.symlink(p / path, p / url)
+        return url
+
+    def parse_file() -> list[dict] | None:
         file = d.get("file")
         if file is None:
             return None
         return [{
-            "url": file,
-            "thumb": d.get("thumbnail"),
+            "url": process_file_path(file),
+            "thumb": process_file_path(d.get("thumbnail")),
             "mime_type": d.get("mime_type"),
             "size": os.path.getsize(p / file),
 
