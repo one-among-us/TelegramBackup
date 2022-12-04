@@ -120,7 +120,7 @@ def convert_msg(d: dict) -> dict:
         file = d.get("file")
         if file is None:
             return None
-        return {
+        return [{
             "url": file,
             "thumb": d.get("thumbnail"),
             "mime_type": d.get("mime_type"),
@@ -142,7 +142,7 @@ def convert_msg(d: dict) -> dict:
             # Audio
             "title": d.get("title"),
             "performer": d.get("performer")
-        }
+        }]
 
     msg = {
         "id": d["id"],
@@ -165,7 +165,7 @@ def convert_msg(d: dict) -> dict:
             "thumb": reply.get("thumbnail") or reply.get("photo"),
         },
         "author": d.get("author"),
-        "file": parse_file()
+        "files": parse_file()
         # TODO: Add more fields
     }
 
