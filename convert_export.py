@@ -60,18 +60,6 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
 
     text = [[e, convert_entity(e)] for e in text]
 
-    # Add spaces in between markdown elements and regular text
-    # for i, tup in enumerate(text):
-    #     e, t = tup
-    #     if isinstance(e, str):
-    #         continue
-    #
-    #     if not t.startswith(" ") and i > 0 and not text[i - 1][1].endswith(" "):
-    #         t = " " + t
-    #     if not t.endswith(" ") and i < len(text) - 1 and not text[i + 1][1].startswith(" "):
-    #         t = t + " "
-    #     text[i][1] = t
-
     return "".join([t[1] for t in text])
 
 
