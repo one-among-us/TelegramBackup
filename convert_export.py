@@ -2,7 +2,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 test_text = [
     "test ",
     {"type": "strikethrough", "text": "strikethrough"},
@@ -49,7 +48,10 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
                 case "spoiler":
                     return f'<span class="spoiler"><span>{t}</span></span>'
                 # case "link":
-                    # return f'<a href="{t}">{t}</a>'
+                #     return f'<a href="{t}">{t}</a>'
+                # case "mention_name":
+                #     id = e['user_id']
+                #     return f'<a href="https://t.me/{id}">{t}</a>'
                 case "hashtag":
                     return f'<a href="{t}">{t}</a>'
                 case "mention":
@@ -74,12 +76,39 @@ def convert_msg(d: dict) -> dict:
         "id": d["id"],
         "date": d["date"],
         "type": None if d.get("type") == "message" else d.get("type"),
-        "text": convert_text(d.get("text"))
+        "text": convert_text(d.get("text")),
+        "views": d.get("views"),  # Views cannot be exported in the current version
+        "images": None if d.get("photo") is None else [
+            {"url": d.get("photo"), "width": d.get("width"), "height": d.get("height")}
+        ],
+        # TODO: Add this in front end
+        "forwarded_From": None if d.get("forwarded_from") is None else [
+            f'<b>forwarded from: {d.get("forwarded_from")}</b>'],
+
+        # TODO: Add this in front end
+        "video": None if d.get("media_type") != "video_file" else {
+            "thumb": d.get("thumbnail"), "duration": d.get("duration_seconds"), "src": d.get("file")
+        },
+        # TODO: Add this in front end
+        "reply": None if d.get("reply_to_message_id") is None else {
+            "id": d.get("reply_to_message_id"),
+            "text": get_topic_content(d["reply_to_message_id"],"text"),
+            "thumb": get_topic_content(d["reply_to_message_id"],"thumbnail"),
+        }
         # TODO: Add more fields
-        # TODO: Convert photo message
     }
 
     return {k: v for k, v in msg.items() if v is not None}
+
+
+def get_topic_content(id: int, type: str) -> str | None:
+    for i in j:
+        if i["id"] == id:
+            match (type):
+                case "thumbnail":
+                    return None if i.get("thumbnail") is None else i.get("thumbnail")
+                case "text":
+                    return convert_text(i.get("text"))
 
 
 if __name__ == '__main__':
@@ -99,4 +128,3 @@ if __name__ == '__main__':
     j = [convert_msg(d) for d in j]
 
     (p / "posts.json").write_text(json.dumps(j, indent=2, ensure_ascii=False))
-
