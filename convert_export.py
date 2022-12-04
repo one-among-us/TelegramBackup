@@ -68,6 +68,29 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
     return "".join([t[1] for t in text])
 
 
+def plain_text(text: str | list[dict | str] | None) -> str | None:
+    """
+    Convert text, remove all formats
+
+    :param text: Telegram export text object
+    :return: Plain text
+    """
+    if text is None:
+        return None
+
+    if isinstance(text, str):
+        return text
+
+    acc = ""
+    for t in text:
+        if isinstance(t, str):
+            acc += t
+        if isinstance(t, dict):
+            acc += t["text"]
+
+    return acc
+
+
 def remove_nones(d: dict) -> dict:
     """
     Recursively remove none values from a dict
@@ -89,6 +112,9 @@ def convert_msg(d: dict) -> dict:
     :param d: Message object dict from telegram export
     :return: Message object for tg-blog model
     """
+    reply_id = d.get("reply_to_message_id")
+    reply = id_map.get(reply_id)
+
     msg = {
         "id": d["id"],
         "date": d["date"],
@@ -106,10 +132,10 @@ def convert_msg(d: dict) -> dict:
             "thumb": d.get("thumbnail"), "duration": d.get("duration_seconds"), "src": d.get("file")
         },
         # TODO: Add this in front end
-        "reply": None if d.get("reply_to_message_id") is None else {
-            "id": d.get("reply_to_message_id"),
-            "text": get_topic_content(d["reply_to_message_id"],"text"),
-            "thumb": get_topic_content(d["reply_to_message_id"],"thumbnail"),
+        "reply": None if reply_id is None else {
+            "id": reply_id,
+            "text": plain_text(reply.get("text")),
+            "thumb": reply.get("thumbnail") or reply.get("photo"),
         }
         # TODO: Add more fields
     }
@@ -139,6 +165,7 @@ if __name__ == '__main__':
 
     # Read export result json
     j: list[dict] = json.loads(f.read_text())["messages"]
+    id_map = {d['id']: d for d in j}
 
     # Convert
     j = [convert_msg(d) for d in j]
