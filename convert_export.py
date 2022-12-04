@@ -103,7 +103,9 @@ def remove_nones(d: dict) -> dict:
     :param d: Dict
     :return: Dict without nones
     """
-    return {k: remove_nones(v) if isinstance(v, dict) else v
+    if not isinstance(d, dict):
+        return d
+    return {k: remove_nones(v) if isinstance(v, dict) else [remove_nones(i) for i in v] if isinstance(v, list) else v
             for k, v in d.items() if v is not None}
 
 
