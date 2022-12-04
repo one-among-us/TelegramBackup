@@ -143,16 +143,6 @@ def convert_msg(d: dict) -> dict:
     return remove_nones(msg)
 
 
-def get_topic_content(id: int, type: str) -> str | None:
-    for i in j:
-        if i["id"] == id:
-            match (type):
-                case "thumbnail":
-                    return None if i.get("thumbnail") is None else i.get("thumbnail")
-                case "text":
-                    return convert_text(i.get("text"))
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Telegram export converter",
                                      description="A tool to convert exported json into tg-blog json")
