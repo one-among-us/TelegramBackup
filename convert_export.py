@@ -141,8 +141,9 @@ def process_file_path(path: str | None) -> str | None:
         return path
 
     # Move file
-    if not os.path.islink(p / url):
-        os.symlink(p / path, p / url)
+    if os.path.islink(p / url):
+        os.unlink(p / url)
+    os.symlink((p / path).relative_to((p / url).parent), p / url)
     return url
 
 
