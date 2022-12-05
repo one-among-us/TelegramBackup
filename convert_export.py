@@ -64,6 +64,9 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
                 case "mention":
                     url = f'https://t.me/{t.strip("@")}'
                     return f'<a href="{url}">{t}</a>'
+                # case "custom_emoji":
+                #
+                #     return f'<i class="emoji" style="background-image:url({})"></i>'
                 case _:
                     return t
 
@@ -111,7 +114,72 @@ def remove_nones(d: dict) -> dict:
             for k, v in d.items() if v is not None}
 
 
-def convert_msg(d: dict) -> dict:
+def process_file_path(path: str | None) -> str | None:
+    """
+    Ensure file paths are url-safe
+    """
+    if path is None:
+        return None
+
+    # Convert tgs stickers to apng
+    if path.endswith(".tgs"):
+        out = path[:-len(".tgs")] + ".apng"
+
+        if not (p / out).is_file():
+            # Decompress to json
+            json = path + ".json"
+            (p / json).write_bytes(zlib.decompress((p / path).read_bytes(), 15 + 32))
+
+            # Convert json to apng
+            check_output(['./node_modules/.bin/puppeteer-lottie', '-i', p / json, '-o', p / out])
+
+        # Use apng instead
+        path = out
+
+    url = urllib.parse.quote(path)
+    if url == path:
+        return path
+
+    # Move file
+    if not os.path.islink(p / url):
+        os.symlink(p / path, p / url)
+    return url
+
+
+def parse_file(d: dict) -> dict | None:
+    file = d.get("file")
+    if file is None:
+        return None
+    return {
+        "url": process_file_path(file),
+        "thumb": process_file_path(d.get("thumbnail")),
+        "mime_type": d.get("mime_type"),
+        "size": os.path.getsize(p / file),
+
+        # Media
+        "media_type": d.get("media_type"),
+
+        # Video/audio/gif
+        "duration": d.get("duration_seconds"),
+
+        # Video/sticker/gif
+        "width": d.get("width"),
+        "height": d.get("height"),
+
+        # Sticker
+        "sticker_emoji": d.get("sticker_emoji"),
+
+        # Audio
+        "title": d.get("title"),
+        "performer": d.get("performer")
+    }
+
+
+def get_image(d: dict) -> dict:
+    return {"url": d.get("photo"), "width": d.get("width"), "height": d.get("height")}
+
+
+def convert_msg(d: dict) -> dict | None:
     """
     Convert a message object
 
@@ -121,72 +189,43 @@ def convert_msg(d: dict) -> dict:
     reply_id = d.get("reply_to_message_id")
     reply = id_map.get(reply_id)
 
-    def process_file_path(path: str | None) -> str | None:
-        """
-        Ensure file paths are url-safe
-        """
-        if path is None:
+    # Message group quirks
+    grp = d.get("media_group_id")
+    if grp in processed_groups:
+        return None
+    if grp is not None:
+        processed_groups.append(grp)
+
+    def get_group_text():
+        if grp is None:
+            return convert_text(d.get("text"))
+        for msg in groups[grp]:
+            t = convert_text(msg.get("text"))
+            if t:
+                return t
+        return None
+
+    def get_group_images():
+        if d.get("photo") is None:
             return None
+        if grp is None:
+            return [get_image(d)]
+        return [get_image(m) for m in groups[grp]]
 
-        # Convert tgs stickers to apng
-        if path.endswith(".tgs"):
-            # Decompress to json
-            json = path + ".json"
-            (p / json).write_bytes(zlib.decompress((p / path).read_bytes(), 15 + 32))
-
-            # Convert json to apng
-            out = path[:-len(".tgs")] + ".apng"
-            check_output(['./node_modules/.bin/puppeteer-lottie', '-i', p / json, '-o', p / out])
-
-            # Use apng instead
-            path = out
-
-        url = urllib.parse.quote(path)
-        if url == path:
-            return path
-
-        # Move file
-        if not os.path.islink(p / url):
-            os.symlink(p / path, p / url)
-        return url
-
-    def parse_file() -> list[dict] | None:
-        file = d.get("file")
-        if file is None:
+    def get_group_files():
+        if d.get("file") is None:
             return None
-        return [{
-            "url": process_file_path(file),
-            "thumb": process_file_path(d.get("thumbnail")),
-            "mime_type": d.get("mime_type"),
-            "size": os.path.getsize(p / file),
-
-            # Media
-            "media_type": d.get("media_type"),
-
-            # Video/audio/gif
-            "duration": d.get("duration_seconds"),
-
-            # Video/sticker/gif
-            "width": d.get("width"),
-            "height": d.get("height"),
-
-            # Sticker
-            "sticker_emoji": d.get("sticker_emoji"),
-
-            # Audio
-            "title": d.get("title"),
-            "performer": d.get("performer")
-        }]
+        if grp is None:
+            return [parse_file(d)]
+        return [parse_file(m) for m in groups[grp]]
 
     msg = {
         "id": d["id"],
         "date": d["date"],
         "type": None if d.get("type") == "message" else d.get("type"),
-        "text": convert_text(d.get("text")),
+        "text": get_group_text(),
         "views": d.get("views"),  # Views cannot be exported in the current version
-        "images": None if d.get("photo") is None else [
-            {"url": d.get("photo"), "width": d.get("width"), "height": d.get("height")}
-        ],
+        "images": get_group_images(),
         "forwarded_from": d.get("forwarded_from"),
 
         # TODO: Add this in front end
@@ -199,11 +238,57 @@ def convert_msg(d: dict) -> dict:
             "thumb": reply.get("thumbnail") or reply.get("photo"),
         },
         "author": d.get("author"),
-        "files": parse_file()
+        "files": get_group_files()
         # TODO: Add more fields
     }
 
     return remove_nones(msg)
+
+
+def infer_groups(msgs: list[dict]):
+    """
+    Infer message media/file/photo groups from timestamp and media type
+
+    :param msgs: Messages (will be modified)
+    :return: None
+    """
+    i = 0
+    c_group = 0
+    c_type = ""
+    c_time = 0
+    c_count = 0
+    while i < len(msgs):
+        it = msgs[i]
+        time = int(it['date_unixtime'])
+
+        if it.get('photo'):
+            ty = "photo"
+        else:
+            ty = it.get("media_type")
+
+        try:
+            # Type cannot be a sticker / video / regular message
+            assert ty is not None and ty != "sticker" and ty != 'video'
+
+            # Timestamps are within 5 seconds
+            assert abs(c_time - time) < 5
+
+            # Types must match
+            assert c_type == ty
+
+            # Assign group id
+            msgs[i - 1]['media_group_id'] = c_group
+            it['media_group_id'] = c_group
+            c_count += 1
+
+        except AssertionError:
+            c_type = ty
+            c_time = time
+            c_count = 0
+            c_group += 1
+            pass
+
+        i += 1
 
 
 if __name__ == '__main__':
@@ -220,7 +305,19 @@ if __name__ == '__main__':
     j: list[dict] = json.loads(f.read_text())["messages"]
     id_map = {d['id']: d for d in j}
 
+    # Assign groups
+    infer_groups(j)
+
+    # Group groups
+    tmp_grouped: list[dict] = [d for d in j if 'media_group_id' in d]
+    group_ids: set[int] = {d['media_group_id'] for d in tmp_grouped}
+    groups: dict[int, list[dict]] = {g: [d for d in tmp_grouped if d['media_group_id'] == g] for g in group_ids}
+    processed_groups: list[int] = []
+
+    # print(json.dumps(j, indent=2, ensure_ascii=False))
+
     # Convert
     j = [convert_msg(d) for d in j]
+    j = [d for d in j if d is not None]
 
     (p / "posts.json").write_text(json.dumps(j, indent=2, ensure_ascii=False))

@@ -63,7 +63,6 @@ async def process_messages(msgs: list[Message]):
             fp = fp.absolute().relative_to(Path().absolute())
 
 
-
 async def run(app: Client):
     me: User = await app.get_me()
     print(f"Login success! ID: {me.id} | is_bot: {me.is_bot}")
@@ -71,12 +70,9 @@ async def run(app: Client):
     print(f"Chat obtained. Chat name: {chat.title} | Type: {chat.type} | ID: {chat.id}")
     # Bot
     msgs = await app.get_messages(chat.id, range(1, 30))
-    print('\n'.join([f'{m.id}: {effective_text(m)}' for m in msgs if not m.empty]))
+    # print('\n'.join([f'{m.id}: {effective_text(m)}' for m in msgs if not m.empty]))
+    print(msgs)
     await process_messages(msgs)
-
-    # User only:
-    # async for msg in app.get_chat_history(chat.id):
-    #     print(msg.text)
 
 
 if __name__ == '__main__':
