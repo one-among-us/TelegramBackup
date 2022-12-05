@@ -4,7 +4,10 @@ import os.path
 import urllib.parse
 import zlib
 from pathlib import Path
-from subprocess import check_output
+from subprocess import check_output, check_call
+
+SCRIPT_PATH = Path(__file__).parent
+
 
 test_text = [
     "test ",
@@ -15,6 +18,39 @@ test_text = [
     {"type": "bold", "text": "bold"},
     {"type": "spoiler", "text": "spoiler"}
 ]
+
+
+def tgs_to_apng(tgs: str) -> str:
+    out = str(Path(tgs).with_suffix(".apng"))
+
+    if not (p / out).is_file():
+        # Decompress to json
+        json = tgs + ".json"
+        (p / json).write_bytes(zlib.decompress((p / tgs).read_bytes(), 15 + 32))
+
+        # Convert json to apng
+        check_call([SCRIPT_PATH / 'node_modules/.bin/puppeteer-lottie', '-i', p / json, '-o', p / out])
+
+        # Delete json
+        os.remove(p / json)
+
+    return out
+
+
+def webm_to_apng(webm: str) -> str:
+    out = str(Path(webm).with_suffix(".apng"))
+
+    if not (p / out).is_file():
+        # Convert webm to apng using ffmpeg
+        cmd = ['ffmpeg', '-c:v', 'libvpx-vp9',
+               # '-pix_fmt', 'yuva420p',
+               '-i', str(p / webm),
+               '-plays', '0',
+               str(p / out)]
+        print(' '.join(cmd))
+        check_call(cmd)
+
+    return out
 
 
 def convert_text(text: str | list[dict | str] | None) -> str | None:
@@ -40,7 +76,7 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
             t = e["text"]
             match e["type"]:
                 case "strikethrough":
-                    return f"<strike>{t}</strike>"
+                    return f"<del>{t}</del>"
                 case "code":
                     return f"<code>{t}</code>"
                 case "italic":
@@ -64,9 +100,11 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
                 case "mention":
                     url = f'https://t.me/{t.strip("@")}'
                     return f'<a href="{url}">{t}</a>'
-                # case "custom_emoji":
-                #
-                #     return f'<i class="emoji" style="background-image:url({})"></i>'
+                case "custom_emoji":
+                    url: str = e['document_id']
+                    # if url.endswith(".webm"):
+                    #     url = webm_to_apng(url)
+                    return f'<i class="custom-emoji" emoji-src="{url}">{t}</i>'
                 case _:
                     return t
 
@@ -123,18 +161,7 @@ def process_file_path(path: str | None) -> str | None:
 
     # Convert tgs stickers to apng
     if path.endswith(".tgs"):
-        out = path[:-len(".tgs")] + ".apng"
-
-        if not (p / out).is_file():
-            # Decompress to json
-            json = path + ".json"
-            (p / json).write_bytes(zlib.decompress((p / path).read_bytes(), 15 + 32))
-
-            # Convert json to apng
-            check_output(['./node_modules/.bin/puppeteer-lottie', '-i', p / json, '-o', p / out])
-
-        # Use apng instead
-        path = out
+        path = tgs_to_apng(path)
 
     url = urllib.parse.quote(path)
     if url == path:
