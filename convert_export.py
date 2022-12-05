@@ -186,15 +186,12 @@ def convert_msg(d: dict) -> dict | None:
     :param d: Message object dict from telegram export
     :return: Message object for tg-blog model
     """
-    reply_id = d.get("reply_to_message_id")
-    reply = id_map.get(reply_id)
-
     # Message group quirks
     grp = d.get("media_group_id")
     if grp in processed_groups:
         return None
     if grp is not None:
-        processed_groups.append(grp)
+        processed_groups[grp] = d['id']
 
     def get_group_text():
         if grp is None:
@@ -219,6 +216,11 @@ def convert_msg(d: dict) -> dict | None:
             return [parse_file(d)]
         return [parse_file(m) for m in groups[grp]]
 
+    reply = id_map.get(d.get("reply_to_message_id"))
+    # Resolve reply group to the final message id
+    if reply and reply.get('media_group_id'):
+        reply = id_map.get(processed_groups[reply.get("media_group_id")])
+
     msg = {
         "id": d["id"],
         "date": d["date"],
@@ -232,8 +234,8 @@ def convert_msg(d: dict) -> dict | None:
         "video": None if d.get("media_type") != "video_file" else {
             "thumb": d.get("thumbnail"), "duration": d.get("duration_seconds"), "src": d.get("file")
         },
-        "reply": None if reply_id is None else {
-            "id": reply_id,
+        "reply": None if reply is None else {
+            "id": reply['id'],
             "text": plain_text(reply.get("text")),
             "thumb": reply.get("thumbnail") or reply.get("photo"),
         },
@@ -312,7 +314,7 @@ if __name__ == '__main__':
     tmp_grouped: list[dict] = [d for d in j if 'media_group_id' in d]
     group_ids: set[int] = {d['media_group_id'] for d in tmp_grouped}
     groups: dict[int, list[dict]] = {g: [d for d in tmp_grouped if d['media_group_id'] == g] for g in group_ids}
-    processed_groups: list[int] = []
+    processed_groups: dict[int, int] = {}
 
     # print(json.dumps(j, indent=2, ensure_ascii=False))
 
