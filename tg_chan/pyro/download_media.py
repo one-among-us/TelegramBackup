@@ -16,24 +16,42 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
-import os
-from datetime import datetime
 from pathlib import Path
-from typing import Union, Optional, Callable, BinaryIO
+from typing import Callable
 
-import pyrogram
-from pyrogram import types
+from hypy_utils import ensure_dir
+from pyrogram import types, Client
 from pyrogram.file_id import FileId, FileType, PHOTO_TYPES
 
 
+def guess_ext(client: Client, file_type: int, mime_type: str) -> str:
+    guessed_extension = client.guess_extension(mime_type)
+
+    if file_type in PHOTO_TYPES:
+        return ".jpg"
+    elif file_type == FileType.VOICE:
+        return guessed_extension or ".ogg"
+    elif file_type in (FileType.VIDEO, FileType.ANIMATION, FileType.VIDEO_NOTE):
+        return guessed_extension or ".mp4"
+    elif file_type == FileType.DOCUMENT:
+        return guessed_extension or ".zip"
+    elif file_type == FileType.STICKER:
+        return guessed_extension or ".webp"
+    elif file_type == FileType.AUDIO:
+        return guessed_extension or ".mp3"
+    else:
+        return ".unknown"
+
+
 async def download_media(
-        client: pyrogram.Client,
+        client: Client,
         message: types.Message,
-        directory: str = "media",
+        directory: str | Path = "media",
         progress: Callable = None,
         progress_args: tuple = ()
 ) -> Path:
+    directory: Path = ensure_dir(directory)
+
     available_media = ("audio", "document", "photo", "sticker", "animation", "video", "voice", "video_note",
                        "new_chat_photo")
 
@@ -54,43 +72,26 @@ async def download_media(
         file_id_str = media.file_id
 
     file_id_obj = FileId.decode(file_id_str)
-
     file_type = file_id_obj.file_type
-    media_file_name = getattr(media, "file_name", "")
+
     file_size = getattr(media, "file_size", 0)
     mime_type = getattr(media, "mime_type", "")
     date = getattr(media, "date", None)
 
-    file_name = media_file_name or ""
+    file_name = getattr(media, "file_name")
 
     if not file_name:
-        guessed_extension = client.guess_extension(mime_type)
+        file_name = f"{FileType(file_type).name.lower()}"
+        if date:
+            file_name += f"_{date.strftime('%Y-%m-%d_%H-%M-%S')}"
+        file_name += guess_ext(client, file_type, mime_type)
 
-        if file_type in PHOTO_TYPES:
-            extension = ".jpg"
-        elif file_type == FileType.VOICE:
-            extension = guessed_extension or ".ogg"
-        elif file_type in (FileType.VIDEO, FileType.ANIMATION, FileType.VIDEO_NOTE):
-            extension = guessed_extension or ".mp4"
-        elif file_type == FileType.DOCUMENT:
-            extension = guessed_extension or ".zip"
-        elif file_type == FileType.STICKER:
-            extension = guessed_extension or ".webp"
-        elif file_type == FileType.AUDIO:
-            extension = guessed_extension or ".mp3"
-        else:
-            extension = ".unknown"
-
-        file_name = f"{FileType(file_id_obj.file_type).name.lower()}_{date.strftime('%Y-%m-%d_%H-%M-%S')}{extension}"
-
-    p = Path(directory) / file_name
+    p = directory / file_name
     if p.exists():
         return p
 
     print(f"Downloading {p}...")
 
-    downloader = client.handle_download(
+    return Path(await client.handle_download(
         (file_id_obj, directory, file_name, False, file_size, progress, progress_args)
-    )
-
-    return Path(await downloader)
+    ))
