@@ -1,6 +1,0 @@
-wheel
-pyrogram
-ruamel.yaml
-tgcrypto
-uvloop
-hypy_utils
