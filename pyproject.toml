@@ -35,4 +35,5 @@ packages = ['tgc']
 version = {attr = "tgc.__version__"}
 
 [project.scripts]
-twb = "tgc.__main__:run"
+tgc = "tgc.__main__:run"
+tgce = "tgc.convert_export:run"

@@ -6,6 +6,8 @@ import zlib
 from pathlib import Path
 from subprocess import check_output, check_call
 
+from hypy_utils import printc
+
 SCRIPT_PATH = Path(__file__).parent
 
 
@@ -321,7 +323,14 @@ def infer_groups(msgs: list[dict]):
         i += 1
 
 
-if __name__ == '__main__':
+p: Path
+id_map: dict[int, dict]
+groups: dict[int, list[dict]]
+processed_groups: dict[int, int]
+
+
+def run():
+    global p, id_map, groups, processed_groups
     parser = argparse.ArgumentParser("Telegram export converter",
                                      description="A tool to convert exported json into tg-blog json")
     parser.add_argument("dir", help="Export directory")
@@ -341,8 +350,8 @@ if __name__ == '__main__':
     # Group groups
     tmp_grouped: list[dict] = [d for d in j if 'media_group_id' in d]
     group_ids: set[int] = {d['media_group_id'] for d in tmp_grouped}
-    groups: dict[int, list[dict]] = {g: [d for d in tmp_grouped if d['media_group_id'] == g] for g in group_ids}
-    processed_groups: dict[int, int] = {}
+    groups = {g: [d for d in tmp_grouped if d['media_group_id'] == g] for g in group_ids}
+    processed_groups = {}
 
     # print(json.dumps(j, indent=2, ensure_ascii=False))
 
@@ -351,3 +360,9 @@ if __name__ == '__main__':
     j = [d for d in j if d is not None]
 
     (p / "posts.json").write_text(json.dumps(j, indent=2, ensure_ascii=False))
+
+    printc(f"&aDone! Saved to {p / 'posts.json'}")
+
+
+if __name__ == '__main__':
+    run()
