@@ -6,19 +6,14 @@ import uvloop
 from pyrogram import Client
 from pyrogram.enums import MessageMediaType
 from pyrogram.types import User, Chat, Message
-from ruamel import yaml
 
-from tg_chan.pyro.convert import convert_text
-from ..convert_export import remove_nones
+from .config import load_config, Config
+from .convert import convert_text
 from .download_media import download_media
+from ..convert_export import remove_nones
 
 MEDIA_PATH = Path("media")
 uvloop.install()
-
-
-def load_config(path: str) -> dict:
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
 
 
 def parse_msg(msg: Message) -> dict | None:
@@ -112,20 +107,25 @@ async def process_chat(chat_id: int, path: Path):
     # await process_messages(msgs, path)
 
 
-async def run(app: Client):
+async def run_app():
     me: User = await app.get_me()
     print(f"Login success! ID: {me.id} | is_bot: {me.is_bot}")
-    for export in cfg["exports"]:
+    for export in cfg.exports:
         await process_chat(int(export["chat_id"]), Path(export["path"]))
 
 
-if __name__ == '__main__':
+cfg: Config
+app: Client
+
+
+def run():
+    global app, cfg
     parser = argparse.ArgumentParser("Telegram Channel Message to Public API Crawler")
-    parser.add_argument("config", help="Config path", nargs="?", default="config.yml")
+    parser.add_argument("config", help="Config path", nargs="?", default="config.toml")
     args = parser.parse_args()
     cfg = load_config(args.config)
 
-    app = Client("Bot", cfg["api_id"], cfg["api_hash"], bot_token=cfg["bot_token"])
+    app = Client("Bot", cfg.api_id, cfg.api_hash, bot_token=cfg.bot_token)
 
     with app:
-        asyncio.get_event_loop().run_until_complete(run(app))
+        asyncio.get_event_loop().run_until_complete(run_app())

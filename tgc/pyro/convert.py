@@ -4,9 +4,9 @@ from pyrogram.raw.types import Message
 from pyrogram.types import MessageEntity
 
 
-def convert_media(msg: Message) -> dict:
-    match msg.media:
-        case MessageMediaType.VIDEO:
+# def convert_media(msg: Message) -> dict:
+#     match msg.media:
+#         case MessageMediaType.VIDEO:
 
 
 
