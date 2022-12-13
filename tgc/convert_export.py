@@ -23,27 +23,29 @@ test_text = [
 ]
 
 
-def find_lottie() -> Path:
-    # Find lottie path
-    lottie = which("puppeteer-lottie")
-    if not lottie or not os.path.isfile(lottie):
-        lottie = SCRIPT_PATH / 'node_modules/.bin/puppeteer-lottie'
-    if not lottie.is_file():
-        lottie = Path('node_modules/.bin/puppeteer-lottie')
-    if not lottie.is_file():
-        lottie = Path.home() / 'node_modules/.bin/puppeteer-lottie'
-    if not lottie.is_file():
-        lottie = Path.home() / '.config/yarn/global/node_modules/.bin/puppeteer-lottie'
-    if not lottie.is_file():
-        lottie = Path('/usr/local/bin/puppeteer-lottie')
-    if not lottie.is_file():
-        lottie = Path('/usr/bin/puppeteer-lottie')
-    if not lottie.is_file():
-        printc("&cError! Cannot find puppeteer-lottie. \n"
-               "Make sure to install it using 'yarn global add puppeteer-lottie-cli'")
-        exit(3)
+NODE_BIN_PATHS: list[Path] = [
+    SCRIPT_PATH / 'node_modules/.bin',
+    Path('node_modules/.bin'),
+    Path.home() / 'node_modules/.bin',
+    Path.home() / '.config/yarn/global/node_modules/.bin',
+    Path('/usr/local/bin'),
+    Path('/usr/bin')
+]
 
-    return Path(lottie)
+
+def find_node_bin(name: str, pkg_name: str) -> Path:
+    # Find bin path
+    path = which(name)
+    if path and os.path.isfile(path):
+        return Path(path)
+
+    for bin in NODE_BIN_PATHS:
+        if (bin / name).is_file():
+            return bin / name
+
+    printc(f"&cError! Cannot find node executable {name}. \n"
+           f"Make sure to install it using 'yarn global add {pkg_name}'")
+    exit(3)
 
 
 def tgs_to_apng(tgs: str) -> str:
@@ -55,7 +57,7 @@ def tgs_to_apng(tgs: str) -> str:
         (p / json).write_bytes(zlib.decompress((p / tgs).read_bytes(), 15 + 32))
 
         # Convert json to apng
-        check_call([find_lottie(), '-i', p / json, '-o', p / out])
+        check_call([find_node_bin("puppeteer-lottie", "puppeteer-lottie-cli"), '-i', p / json, '-o', p / out])
 
         # Delete json
         os.remove(p / json)
