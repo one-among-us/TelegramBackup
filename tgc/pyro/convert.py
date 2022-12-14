@@ -1,13 +1,43 @@
 from pyrogram.enums import MessageEntityType, MessageMediaType
 from pyrogram.parser import utils
-from pyrogram.raw.types import Message
-from pyrogram.types import MessageEntity
+from pyrogram.types import MessageEntity, Photo, Message
 
 
-# def convert_media(msg: Message) -> dict:
-#     match msg.media:
-#         case MessageMediaType.VIDEO:
+def convert_media_dict(msg: Message) -> dict:
+    def helper():
+        match msg.media:
+            case MessageMediaType.PHOTO:
+                return vars(msg.photo)
+            case MessageMediaType.VIDEO:
+                return vars(msg.video)
+            case MessageMediaType.AUDIO:
+                return vars(msg.audio)
+            case MessageMediaType.VOICE:
+                return vars(msg.voice)
+            case MessageMediaType.DOCUMENT:
+                return vars(msg.document)
+            case MessageMediaType.STICKER:
+                return vars(msg.sticker)
+            case MessageMediaType.ANIMATION:
+                return vars(msg.animation)
+            case MessageMediaType.VIDEO_NOTE:
+                return vars(msg.video_note)
+            case MessageMediaType.CONTACT:
+                return vars(msg.contact)
+            case MessageMediaType.LOCATION:
+                return vars(msg.location)
+            case MessageMediaType.VENUE:
+                return vars(msg.venue)
+            case MessageMediaType.POLL:
+                return vars(msg.poll)
+            case MessageMediaType.WEB_PAGE:
+                return vars(msg.web_page)
+        return {}
 
+    d = helper()
+    d = {k: v for k, v in d.items() if k not in {'_client', 'file_id', 'file_unique_id'}}
+
+    return d
 
 
 def entity_start_end(text: str, en: MessageEntity) -> tuple[str, str] | None:

@@ -17,15 +17,19 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Any
+from urllib import parse
 
 from hypy_utils import ensure_dir
 from pyrogram import types, Client
 from pyrogram.file_id import FileId, FileType, PHOTO_TYPES
+from pyrogram.types import Message
+
+from tgc.pyro.utils import escape_filename
 
 
-def guess_ext(client: Client, file_type: int, mime_type: str) -> str:
-    guessed_extension = client.guess_extension(mime_type)
+def guess_ext(client: Client, file_type: int, mime_type: str | None) -> str:
+    guessed_extension = client.guess_extension(mime_type) if mime_type else None
 
     if file_type in PHOTO_TYPES:
         return ".jpg"
@@ -43,15 +47,7 @@ def guess_ext(client: Client, file_type: int, mime_type: str) -> str:
         return ".unknown"
 
 
-async def download_media(
-        client: Client,
-        message: types.Message,
-        directory: str | Path = "media",
-        progress: Callable = None,
-        progress_args: tuple = ()
-) -> Path:
-    directory: Path = ensure_dir(directory)
-
+def has_media(message: Message) -> Any | None:
     available_media = ("audio", "document", "photo", "sticker", "animation", "video", "voice", "video_note",
                        "new_chat_photo")
 
@@ -62,9 +58,24 @@ async def download_media(
             if media is not None:
                 break
         else:
-            raise ValueError("This message doesn't contain any downloadable media")
+            return None
     else:
         media = message
+
+    return media
+
+
+async def download_media(
+        client: Client,
+        message: types.Message,
+        directory: str | Path = "media",
+        fname: str | None = None,
+        progress: Callable = None,
+        progress_args: tuple = ()
+) -> Path:
+    directory: Path = ensure_dir(directory)
+
+    media = has_media(message)
 
     if isinstance(media, str):
         file_id_str = media
@@ -78,13 +89,14 @@ async def download_media(
     mime_type = getattr(media, "mime_type", "")
     date = getattr(media, "date", None)
 
-    file_name = getattr(media, "file_name")
+    file_name = fname or getattr(media, "file_name", None)
 
     if not file_name:
         file_name = f"{FileType(file_type).name.lower()}"
         if date:
             file_name += f"_{date.strftime('%Y-%m-%d_%H-%M-%S')}"
         file_name += guess_ext(client, file_type, mime_type)
+    file_name = escape_filename(file_name)
 
     p = directory / file_name
     if p.exists():

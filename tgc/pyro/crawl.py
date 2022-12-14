@@ -3,13 +3,15 @@ import asyncio
 from pathlib import Path
 
 import uvloop
+from hypy_utils import printc, write_json, json_stringify, write
 from pyrogram import Client
 from pyrogram.enums import MessageMediaType
-from pyrogram.types import User, Chat, Message
+from pyrogram.file_id import FileId
+from pyrogram.types import User, Chat, Message, Thumbnail
 
 from .config import load_config, Config
-from .convert import convert_text
-from .download_media import download_media
+from .convert import convert_text, convert_media_dict
+from .download_media import download_media, has_media, guess_ext
 from ..convert_export import remove_nones
 
 MEDIA_PATH = Path("media")
@@ -68,48 +70,51 @@ def _download_media_helper(args: list) -> Path:
     return asyncio.run(download_media(app, *args))
 
 
-def process_message(msg: Message) -> dict:
+async def process_message(msg: Message, path: Path) -> dict:
     m = {
         "id": msg.id,
         "date": msg.date,
         "text": effective_text(msg),
         "author": msg.author_signature,
         "views": msg.views,
-        "forwards": msg.forwards
+        "forwards": msg.forwards,
+        "reply_id": msg.reply_to_message_id,
+        "file": convert_media_dict(msg)
     }
+
+    # Download file
+    if has_media(msg):
+        fp = await download_media(app, msg, directory=path / "media")
+        f = m['file']
+        f['url'] = str(fp.absolute().relative_to(path.absolute()))
+
+        # Download the largest thumbnail
+        if f.get('thumbs'):
+            thumb: Thumbnail = max(f['thumbs'], key=lambda x: x.file_size)
+            ext = guess_ext(app, FileId.decode(thumb.file_id).file_type, None)
+            fp = await download_media(app, thumb.file_id, directory=path / "media",
+                                      fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name)
+            f['thumb'] = str(fp.absolute().relative_to(path.absolute()))
+            del f['thumbs']
 
     return remove_nones(m)
 
 
-async def process_messages(msgs: list[Message], path: Path):
-    # 1. Download media
-    # media_msgs = [[m] for m in msgs if m.media]
-    # fps: list[Path] = smap(_download_media_helper, media_msgs)
-    # print([fp.relative_to(Path().absolute()) for fp in fps])
-    for m in msgs:
-        if m.media:
-            fp = await download_media(app, m)
-            fp = fp.absolute().relative_to(Path().absolute())
-
-
 async def process_chat(chat_id: int, path: Path):
     chat: Chat = await app.get_chat(chat_id)
-    print(f"Chat obtained. Chat name: {chat.title} | Type: {chat.type} | ID: {chat.id}")
+    printc(f"&aChat obtained. Chat name: {chat.title} | Type: {chat.type} | ID: {chat.id}")
 
     # Crawl messages
     msgs = await app.get_messages(chat.id, range(1, 40))
 
-    # for m in msgs:
-    #     print(type(m.media))
-
-    # print('\n'.join([f'{m.id}: {effective_text(m)}' for m in msgs if not m.empty]))
-    print(msgs)
-    # await process_messages(msgs, path)
+    # print(msgs)
+    results = [await process_message(m, path) for m in msgs]
+    write(path / "posts.json", json_stringify(results, indent=2))
 
 
 async def run_app():
     me: User = await app.get_me()
-    print(f"Login success! ID: {me.id} | is_bot: {me.is_bot}")
+    printc(f"&aLogin success! ID: {me.id} | is_bot: {me.is_bot}")
     for export in cfg.exports:
         await process_chat(int(export["chat_id"]), Path(export["path"]))
 
