@@ -155,3 +155,4 @@ Bot.session-journal
 node_modules
 config.toml
 /*.iml
+test
