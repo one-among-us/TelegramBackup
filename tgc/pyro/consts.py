@@ -8,6 +8,7 @@ MEDIA_TYPE_MAP: dict[MessageMediaType, str] = {
     MessageMediaType.ANIMATION: "animation",
     MessageMediaType.VIDEO: "video_file",
     MessageMediaType.VIDEO_NOTE: "video_file",
+    MessageMediaType.DOCUMENT: None,
 
     # TODO: Support these in web ui
     MessageMediaType.CONTACT: "contact",

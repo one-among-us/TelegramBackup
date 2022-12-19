@@ -12,6 +12,7 @@ from pyrogram.types import User, Chat, Message
 from .config import load_config, Config
 from .convert import convert_text, convert_media_dict
 from .download_media import download_media, has_media, guess_ext
+from .grouper import group_msgs
 from ..convert_export import remove_nones
 
 MEDIA_PATH = Path("media")
@@ -73,6 +74,10 @@ async def process_chat(chat_id: int, path: Path):
 
     # print(msgs)
     results = [await process_message(m, path) for m in msgs if not m.empty]
+
+    # Group messages
+    results = group_msgs(results)
+
     write(path / "posts.json", json_stringify(results, indent=2))
 
 
