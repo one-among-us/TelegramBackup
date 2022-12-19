@@ -14,12 +14,14 @@ def group_msgs(msgs: list[dict]) -> list[dict]:
     msgs = sorted(msgs, key=lambda x: x['id'])
 
     # Find groups
+    id_map = {m['id']: m for m in msgs}
     tmp_grouped: list[dict] = [d for d in msgs if 'media_group_id' in d]
     gids: set[int] = {d['media_group_id'] for d in tmp_grouped}
     groups: dict[int, list[dict]] = {g: [d for d in tmp_grouped if d['media_group_id'] == g] for g in gids}
 
     # Group messages
     result = []
+    reply_map: dict[int, dict] = {}
     for gid, grp in groups.items():
         # Loop through each message, find the first message with text
         def find_dominant():
@@ -29,6 +31,7 @@ def group_msgs(msgs: list[dict]) -> list[dict]:
 
         m = find_dominant()
         result.append(m)
+        reply_map.update({a['id']: m for a in grp})
 
         # Group files & images into a list
         m['files'] = [a.get('file') for a in grp if 'file' in a] or None
@@ -42,15 +45,18 @@ def group_msgs(msgs: list[dict]) -> list[dict]:
         if not m['images']:
             del m['images']
 
-        # Change all reply references to this one
-        ids = {a['id'] for a in grp}
-        for o in msgs:
-            if 'reply' in o and o['reply']['id'] in ids:
-                o['reply'] = {
-                    'id': m['id'],
-                    'text': m['text'],
-                    'thumb': ((m.get('files') or [None])[0] or {}).get('thumb')
-                }
+    # Change all reply references
+    for m in msgs:
+        if 'reply_id' not in m:
+            continue
+        rid = m.pop('reply_id')
+        rm = reply_map.get(rid) or id_map[rid]
+
+        m['reply'] = {
+            'id': rm['id'],
+            'text': rm.get('text'),
+            'thumb': ((rm.get('files') or [None])[0] or {}).get('thumb')
+        }
 
     # Add non-grouped messages to results
     grouped_ids = {m['id'] for v in groups.values() for m in v}
