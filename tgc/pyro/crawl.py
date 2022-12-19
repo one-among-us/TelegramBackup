@@ -11,7 +11,7 @@ from pyrogram.types import User, Chat, Message
 
 from .config import load_config, Config
 from .convert import convert_text, convert_media_dict
-from .download_media import download_media, has_media, guess_ext, download_media_hashed
+from .download_media import download_media, has_media, guess_ext, download_media_urlsafe
 from .grouper import group_msgs
 from ..convert_export import remove_nones
 
@@ -43,13 +43,15 @@ async def process_message(msg: Message, path: Path) -> dict:
         "author": msg.author_signature,
         "views": msg.views,
         "forwards": msg.forwards,
+        "forwarded_from": msg.forward_sender_name,
+
         "reply_id": msg.reply_to_message_id,
         "file": convert_media_dict(msg)
     }
 
     # Download file
     if has_media(msg):
-        fp, name = await download_media_hashed(app, msg, directory=path / "media")
+        fp, name = await download_media_urlsafe(app, msg, directory=path / "media")
         f = m['file']
         f['original_name'] = name
         f['url'] = str(fp.absolute().relative_to(path.absolute()))
