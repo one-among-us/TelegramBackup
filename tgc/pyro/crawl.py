@@ -18,25 +18,6 @@ MEDIA_PATH = Path("media")
 uvloop.install()
 
 
-def parse_msg(msg: Message) -> dict | None:
-    if msg.empty:
-        return None
-
-    ty = None
-    text = msg.text.markdown
-    if msg.service:
-        ty = "service"
-        text = msg.service.value + msg.text
-
-    return {k: v for k, v in {
-        'id': msg.id,
-        'date': msg.date,
-        'type': ty,
-        'text': text,
-        'views': msg.views
-    }.items() if v is not None}
-
-
 def effective_text(msg: Message) -> str:
     """
     Get effective text of a message in HTML
