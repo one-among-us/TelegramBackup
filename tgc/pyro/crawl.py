@@ -6,7 +6,7 @@ import uvloop
 from hypy_utils import printc, json_stringify, write
 from hypy_utils.dict_utils import remove_keys
 from pyrogram import Client
-from pyrogram.enums import MessageServiceType
+from pyrogram.enums import MessageServiceType, MessageMediaType
 from pyrogram.file_id import FileId
 from pyrogram.types import User, Chat, Message
 
@@ -15,8 +15,8 @@ from .convert import convert_text, convert_media_dict
 from .download_media import download_media, has_media, guess_ext, download_media_urlsafe
 from .grouper import group_msgs
 from ..convert_export import remove_nones
+from ..convert_media_types import tgs_to_apng
 
-MEDIA_PATH = Path("media")
 uvloop.install()
 
 
@@ -44,6 +44,8 @@ def get_user_name(user: User) -> str:
 
 
 async def process_message(msg: Message, path: Path) -> dict:
+    media_path = path / "media"
+
     m = {
         "id": msg.id,
         "date": msg.date,
@@ -64,16 +66,21 @@ async def process_message(msg: Message, path: Path) -> dict:
 
     # Download file
     if has_media(msg):
-        fp, name = await download_media_urlsafe(app, msg, directory=path / "media")
+        fp, name = await download_media_urlsafe(app, msg, directory=media_path)
         f = m['file']
         f['original_name'] = name
+
+        # Convert tgs sticker
+        if fp.suffix == '.tgs':
+            fp = Path(tgs_to_apng(fp))
+
         f['url'] = str(fp.absolute().relative_to(path.absolute()))
 
         # Download the largest thumbnail
         if f.get('thumbs'):
             thumb: dict = max(f['thumbs'], key=lambda x: x['file_size'])
             ext = guess_ext(app, FileId.decode(thumb['file_id']).file_type, None)
-            fp = await download_media(app, thumb['file_id'], directory=path / "media",
+            fp = await download_media(app, thumb['file_id'], directory=media_path,
                                       fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name)
             f['thumb'] = str(fp.absolute().relative_to(path.absolute()))
             del f['thumbs']

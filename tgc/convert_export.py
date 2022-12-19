@@ -1,17 +1,13 @@
 import argparse
 import json
 import os.path
-import zlib
 from pathlib import Path
-from shutil import which
-from subprocess import check_call
 
 from hypy_utils import printc
 from hypy_utils.dict_utils import remove_nones
 from hypy_utils.file_utils import escape_filename
 
-SCRIPT_PATH = Path(__file__).parent
-
+from tgc.convert_media_types import tgs_to_apng
 
 test_text = [
     "test ",
@@ -22,64 +18,6 @@ test_text = [
     {"type": "bold", "text": "bold"},
     {"type": "spoiler", "text": "spoiler"}
 ]
-
-
-NODE_BIN_PATHS: list[Path] = [
-    SCRIPT_PATH / 'node_modules/.bin',
-    Path('node_modules/.bin'),
-    Path.home() / 'node_modules/.bin',
-    Path.home() / '.config/yarn/global/node_modules/.bin',
-    Path('/usr/local/bin'),
-    Path('/usr/bin')
-]
-
-
-def find_node_bin(name: str, pkg_name: str) -> Path:
-    # Find bin path
-    path = which(name)
-    if path and os.path.isfile(path):
-        return Path(path)
-
-    for bin in NODE_BIN_PATHS:
-        if (bin / name).is_file():
-            return bin / name
-
-    printc(f"&cError! Cannot find node executable {name}. \n"
-           f"Make sure to install it using 'yarn global add {pkg_name}'")
-    exit(3)
-
-
-def tgs_to_apng(tgs: str) -> str:
-    out = str(Path(tgs).with_suffix(".apng"))
-
-    if not (p / out).is_file():
-        # Decompress to json
-        json = tgs + ".json"
-        (p / json).write_bytes(zlib.decompress((p / tgs).read_bytes(), 15 + 32))
-
-        # Convert json to apng
-        check_call([find_node_bin("puppeteer-lottie", "puppeteer-lottie-cli"), '-i', p / json, '-o', p / out])
-
-        # Delete json
-        os.remove(p / json)
-
-    return out
-
-
-def webm_to_apng(webm: str) -> str:
-    out = str(Path(webm).with_suffix(".apng"))
-
-    if not (p / out).is_file():
-        # Convert webm to apng using ffmpeg
-        cmd = ['ffmpeg', '-c:v', 'libvpx-vp9',
-               # '-pix_fmt', 'yuva420p',
-               '-i', str(p / webm),
-               '-plays', '0',
-               str(p / out)]
-        print(' '.join(cmd))
-        check_call(cmd)
-
-    return out
 
 
 def convert_text(text: str | list[dict | str] | None) -> str | None:
@@ -174,7 +112,7 @@ def process_file_path(path: str | None) -> str | None:
 
     # Convert tgs stickers to apng
     if path.endswith(".tgs"):
-        path = tgs_to_apng(path)
+        path = str(tgs_to_apng(path).relative_to(p))
 
     url = escape_filename(path)
     if url == path:
