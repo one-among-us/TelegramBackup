@@ -112,7 +112,7 @@ def process_file_path(path: str | None) -> str | None:
 
     # Convert tgs stickers to apng
     if path.endswith(".tgs"):
-        path = str(tgs_to_apng(path).relative_to(p))
+        path = str(tgs_to_apng(p / path).relative_to(p))
 
     url = escape_filename(path)
     if url == path:
