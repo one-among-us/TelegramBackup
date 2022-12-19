@@ -11,7 +11,7 @@ from pyrogram.types import User, Chat, Message
 
 from .config import load_config, Config
 from .convert import convert_text, convert_media_dict
-from .download_media import download_media, has_media, guess_ext
+from .download_media import download_media, has_media, guess_ext, download_media_hashed
 from .grouper import group_msgs
 from ..convert_export import remove_nones
 
@@ -49,8 +49,9 @@ async def process_message(msg: Message, path: Path) -> dict:
 
     # Download file
     if has_media(msg):
-        fp = await download_media(app, msg, directory=path / "media")
+        fp, name = await download_media_hashed(app, msg, directory=path / "media")
         f = m['file']
+        f['original_name'] = name
         f['url'] = str(fp.absolute().relative_to(path.absolute()))
 
         # Download the largest thumbnail

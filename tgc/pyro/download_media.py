@@ -15,11 +15,12 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
-
+import shutil
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Callable, Any
 
-from hypy_utils import ensure_dir
+from hypy_utils import ensure_dir, md5
 from hypy_utils.file_utils import escape_filename
 from pyrogram import types, Client
 from pyrogram.file_id import FileId, FileType, PHOTO_TYPES
@@ -100,8 +101,33 @@ async def download_media(
     if p.exists():
         return p
 
-    print(f"Downloading {p}...")
+    print(f"Downloading {p.name}...")
 
     return Path(await client.handle_download(
         (file_id_obj, directory, file_name, False, file_size, progress, progress_args)
     ))
+
+
+async def download_media_hashed(
+        client: Client,
+        message: types.Message,
+        directory: str | Path = "media",
+        fname: str | None = None,
+        progress: Callable = None,
+        progress_args: tuple = ()
+) -> tuple[Path, str]:
+    """
+    Download media into a hash file
+
+    :return: Hash file path, original file name
+    """
+    with TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+
+        fp = await download_media(client, message, tmp, fname, progress, progress_args)
+        name = fp.name
+        hsh = md5(fp)
+        op = ensure_dir(directory) / (hsh + fp.suffix)
+        shutil.move(fp, op)
+
+        return op, name
