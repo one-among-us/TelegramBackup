@@ -35,6 +35,13 @@ def _download_media_helper(args: list) -> Path:
     return asyncio.run(download_media(app, *args))
 
 
+def get_user_name(user: User) -> str:
+    name = user.first_name or ""
+    if user.last_name:
+        name += " " + user.last_name
+    return name
+
+
 async def process_message(msg: Message, path: Path) -> dict:
     m = {
         "id": msg.id,
@@ -43,8 +50,10 @@ async def process_message(msg: Message, path: Path) -> dict:
         "author": msg.author_signature,
         "views": msg.views,
         "forwards": msg.forwards,
-        "forwarded_from": msg.forward_sender_name,
-
+        "forwarded_from": {
+            "name": get_user_name(msg.forward_from),
+            "url": f'https://t.me/{msg.forward_from.username}' if msg.forward_from.username else None,
+        } if msg.forward_from else None,
         "reply_id": msg.reply_to_message_id,
         "file": convert_media_dict(msg)
     }
