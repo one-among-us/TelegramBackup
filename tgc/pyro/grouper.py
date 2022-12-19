@@ -28,6 +28,7 @@ def group_msgs(msgs: list[dict]) -> list[dict]:
             for m in grp:
                 if 'text' in m:
                     return m
+            return grp[0]
 
         m = find_dominant()
         result.append(m)
@@ -38,8 +39,8 @@ def group_msgs(msgs: list[dict]) -> list[dict]:
         m['images'] = [a.get('image') for a in grp if 'image' in a] or None
 
         # Clean up nones
-        m.pop('file')
-        m.pop('image')
+        m.pop('file', None)
+        m.pop('image', None)
         if not m['files']:
             del m['files']
         if not m['images']:

@@ -55,11 +55,12 @@ async def process_message(msg: Message, path: Path) -> dict:
             "name": get_user_name(msg.forward_from),
             "url": f'https://t.me/{msg.forward_from.username}' if msg.forward_from.username else None,
         } if msg.forward_from else None,
+        "media_group_id": msg.media_group_id,
         "reply_id": msg.reply_to_message_id,
         "file": convert_media_dict(msg)
     }
     st = 'service' if msg.service else None
-    m['type'] = st or (m.get('file') or {}).get('type')
+    m['type'] = st or (m.get('file') or {}).get('media_type')
 
     # Download file
     if has_media(msg):
@@ -76,6 +77,10 @@ async def process_message(msg: Message, path: Path) -> dict:
                                       fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name)
             f['thumb'] = str(fp.absolute().relative_to(path.absolute()))
             del f['thumbs']
+
+    # Move photo to its own key
+    if m['type'] == 'photo':
+        m['image'] = m.pop('file')
 
     return remove_keys(remove_nones(m), {'file_id', 'file_unique_id'})
 
