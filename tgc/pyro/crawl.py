@@ -6,7 +6,6 @@ import uvloop
 from hypy_utils import printc, json_stringify, write
 from hypy_utils.dict_utils import remove_keys
 from pyrogram import Client
-from pyrogram.enums import MessageMediaType
 from pyrogram.file_id import FileId
 from pyrogram.types import User, Chat, Message
 
@@ -48,23 +47,6 @@ def effective_text(msg: Message) -> str:
         return convert_text(msg.caption, msg.caption.entities)
     if msg.service:
         return str(msg.service)
-
-
-MEDIA_TYPE_MAP: dict[MessageMediaType, str] = {
-    MessageMediaType.STICKER: "sticker",
-    MessageMediaType.VOICE: "voice_message",
-    MessageMediaType.AUDIO: "audio_file",
-    MessageMediaType.ANIMATION: "animation",
-    MessageMediaType.VIDEO: "video_file",
-    MessageMediaType.VIDEO_NOTE: "video_file",
-
-    # TODO: Support these in web ui
-    MessageMediaType.CONTACT: "contact",
-    MessageMediaType.POLL: "poll",
-    MessageMediaType.WEB_PAGE: "web_page",
-    MessageMediaType.LOCATION: "location",
-    MessageMediaType.VENUE: "location"
-}
 
 
 def _download_media_helper(args: list) -> Path:
@@ -109,7 +91,7 @@ async def process_chat(chat_id: int, path: Path):
     msgs = await app.get_messages(chat.id, range(1, 40))
 
     # print(msgs)
-    results = [await process_message(m, path) for m in msgs]
+    results = [await process_message(m, path) for m in msgs if not m.empty]
     write(path / "posts.json", json_stringify(results, indent=2))
 
 

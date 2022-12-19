@@ -3,6 +3,8 @@ from pyrogram.enums import MessageEntityType
 from pyrogram.parser import utils
 from pyrogram.types import MessageEntity, Message
 
+from tgc.pyro.consts import MEDIA_TYPE_MAP
+
 
 def convert_media_dict(msg: Message) -> dict:
     def helper():
@@ -14,6 +16,8 @@ def convert_media_dict(msg: Message) -> dict:
         return {}
 
     d = deep_dict(helper(), {'_client'})
+    if d:
+        d['media_type'] = MEDIA_TYPE_MAP.get(msg.media)
 
     return d
 
