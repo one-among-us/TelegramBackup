@@ -79,8 +79,9 @@ async def process_message(msg: Message, path: Path) -> dict:
             del f['thumbs']
 
     # Move photo to its own key
-    if m['type'] == 'photo':
-        m['image'] = m.pop('file')
+    if m['file']:
+        if m['type'] == 'photo' or (not m['type'] and (m['file'].get('mime_type') or "").startswith("image")):
+            m['image'] = m.pop('file')
 
     return remove_keys(remove_nones(m), {'file_id', 'file_unique_id'})
 
