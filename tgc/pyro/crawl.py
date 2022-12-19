@@ -58,6 +58,8 @@ async def process_message(msg: Message, path: Path) -> dict:
         "reply_id": msg.reply_to_message_id,
         "file": convert_media_dict(msg)
     }
+    st = 'service' if msg.service else None
+    m['type'] = st or (m.get('file') or {}).get('type')
 
     # Download file
     if has_media(msg):
