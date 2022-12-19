@@ -18,14 +18,12 @@
 
 from pathlib import Path
 from typing import Callable, Any
-from urllib import parse
 
 from hypy_utils import ensure_dir
+from hypy_utils.file_utils import escape_filename
 from pyrogram import types, Client
 from pyrogram.file_id import FileId, FileType, PHOTO_TYPES
 from pyrogram.types import Message
-
-from tgc.pyro.utils import escape_filename
 
 
 def guess_ext(client: Client, file_type: int, mime_type: str | None) -> str:

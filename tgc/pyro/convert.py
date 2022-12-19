@@ -1,41 +1,19 @@
-from pyrogram.enums import MessageEntityType, MessageMediaType
+from hypy_utils.dict_utils import deep_dict
+from pyrogram.enums import MessageEntityType
 from pyrogram.parser import utils
-from pyrogram.types import MessageEntity, Photo, Message
+from pyrogram.types import MessageEntity, Message
 
 
 def convert_media_dict(msg: Message) -> dict:
     def helper():
-        match msg.media:
-            case MessageMediaType.PHOTO:
-                return vars(msg.photo)
-            case MessageMediaType.VIDEO:
-                return vars(msg.video)
-            case MessageMediaType.AUDIO:
-                return vars(msg.audio)
-            case MessageMediaType.VOICE:
-                return vars(msg.voice)
-            case MessageMediaType.DOCUMENT:
-                return vars(msg.document)
-            case MessageMediaType.STICKER:
-                return vars(msg.sticker)
-            case MessageMediaType.ANIMATION:
-                return vars(msg.animation)
-            case MessageMediaType.VIDEO_NOTE:
-                return vars(msg.video_note)
-            case MessageMediaType.CONTACT:
-                return vars(msg.contact)
-            case MessageMediaType.LOCATION:
-                return vars(msg.location)
-            case MessageMediaType.VENUE:
-                return vars(msg.venue)
-            case MessageMediaType.POLL:
-                return vars(msg.poll)
-            case MessageMediaType.WEB_PAGE:
-                return vars(msg.web_page)
+        for f in ['photo', 'video', 'audio', 'voice', 'document', 'sticker', 'animation', 'video_note', 'contact',
+                  'location', 'venue', 'poll', 'web_page']:
+            dct = getattr(msg, f, None)
+            if dct:
+                return dict(vars(dct))
         return {}
 
-    d = helper()
-    d = {k: v for k, v in d.items() if k not in {'_client', 'file_id', 'file_unique_id'}}
+    d = deep_dict(helper(), {'_client'})
 
     return d
 

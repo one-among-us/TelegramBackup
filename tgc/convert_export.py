@@ -1,13 +1,14 @@
 import argparse
 import json
 import os.path
-import urllib.parse
 import zlib
 from pathlib import Path
 from shutil import which
-from subprocess import check_output, check_call
+from subprocess import check_call
 
 from hypy_utils import printc
+from hypy_utils.dict_utils import remove_nones
+from hypy_utils.file_utils import escape_filename
 
 SCRIPT_PATH = Path(__file__).parent
 
@@ -164,22 +165,6 @@ def plain_text(text: str | list[dict | str] | None) -> str | None:
     return acc
 
 
-def remove_nones(d: dict) -> dict:
-    """
-    Recursively remove none values from a dict
-
-    >>> remove_nones({'a': {'b': None, 'c': 1}, 'b': None, 'c': {'a': None}})
-    {'a': {'c': 1}, 'c': {}}
-
-    :param d: Dict
-    :return: Dict without nones
-    """
-    if not isinstance(d, dict):
-        return d
-    return {k: remove_nones(v) if isinstance(v, dict) else [remove_nones(i) for i in v] if isinstance(v, list) else v
-            for k, v in d.items() if v is not None}
-
-
 def process_file_path(path: str | None) -> str | None:
     """
     Ensure file paths are url-safe
@@ -191,7 +176,7 @@ def process_file_path(path: str | None) -> str | None:
     if path.endswith(".tgs"):
         path = tgs_to_apng(path)
 
-    url = urllib.parse.quote(path)
+    url = escape_filename(path)
     if url == path:
         return path
 

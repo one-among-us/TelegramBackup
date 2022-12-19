@@ -3,11 +3,12 @@ import asyncio
 from pathlib import Path
 
 import uvloop
-from hypy_utils import printc, write_json, json_stringify, write
+from hypy_utils import printc, json_stringify, write
+from hypy_utils.dict_utils import remove_keys
 from pyrogram import Client
 from pyrogram.enums import MessageMediaType
 from pyrogram.file_id import FileId
-from pyrogram.types import User, Chat, Message, Thumbnail
+from pyrogram.types import User, Chat, Message
 
 from .config import load_config, Config
 from .convert import convert_text, convert_media_dict
@@ -90,14 +91,14 @@ async def process_message(msg: Message, path: Path) -> dict:
 
         # Download the largest thumbnail
         if f.get('thumbs'):
-            thumb: Thumbnail = max(f['thumbs'], key=lambda x: x.file_size)
-            ext = guess_ext(app, FileId.decode(thumb.file_id).file_type, None)
-            fp = await download_media(app, thumb.file_id, directory=path / "media",
+            thumb: dict = max(f['thumbs'], key=lambda x: x['file_size'])
+            ext = guess_ext(app, FileId.decode(thumb['file_id']).file_type, None)
+            fp = await download_media(app, thumb['file_id'], directory=path / "media",
                                       fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name)
             f['thumb'] = str(fp.absolute().relative_to(path.absolute()))
             del f['thumbs']
 
-    return remove_nones(m)
+    return remove_keys(remove_nones(m), {'file_id', 'file_unique_id'})
 
 
 async def process_chat(chat_id: int, path: Path):
