@@ -140,7 +140,8 @@ def run():
     args = parser.parse_args()
     cfg = load_config(args.config)
 
-    app = Client("Bot", cfg.api_id, cfg.api_hash, **(dict(bot_token=cfg.bot_token) if cfg.bot_token else {}))
+    app = Client("Bot", cfg.api_id or 2048, cfg.api_hash or "b18441a1ff607e10a989891a5462e627",
+                 **(dict(bot_token=cfg.bot_token) if cfg.bot_token else {}))
 
     with app:
         asyncio.get_event_loop().run_until_complete(run_app())
