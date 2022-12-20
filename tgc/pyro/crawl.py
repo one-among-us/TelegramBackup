@@ -97,11 +97,24 @@ async def process_chat(chat_id: int, path: Path):
     chat: Chat = await app.get_chat(chat_id)
     printc(f"&aChat obtained. Chat name: {chat.title} | Type: {chat.type} | ID: {chat.id}")
 
-    # Crawl messages
-    msgs = await app.get_messages(chat.id, range(1, 40))
+    # Crawl 200 messages each request
+    print("Crawling channel posts...")
+    msgs = []
+    for i in range(999):
+        start_idx = i * 200 + 1
+        end_idx = start_idx + 200
+
+        additional_msgs = await app.get_messages(chat.id, range(start_idx, end_idx))
+        additional_msgs = [m for m in additional_msgs if not m.empty]
+        msgs += additional_msgs
+        print(f"> {len(msgs)} total messages... (up to ID #{end_idx - 1})")
+
+        if not additional_msgs:
+            print("> All 200 messages are empty, we're done.")
+            break
 
     # print(msgs)
-    results = [await process_message(m, path) for m in msgs if not m.empty]
+    results = [await process_message(m, path) for m in msgs]
 
     # Group messages
     results = group_msgs(results)
@@ -127,7 +140,7 @@ def run():
     args = parser.parse_args()
     cfg = load_config(args.config)
 
-    app = Client("Bot", cfg.api_id, cfg.api_hash, bot_token=cfg.bot_token)
+    app = Client("Bot", cfg.api_id, cfg.api_hash, **(dict(bot_token=cfg.bot_token) if cfg.bot_token else {}))
 
     with app:
         asyncio.get_event_loop().run_until_complete(run_app())
