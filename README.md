@@ -40,6 +40,7 @@ Using this method, it can automatically update the channel backup incrementally,
 1. Obtain `api_id` and `api_hash` by creating your Telegram application ([Official Guide](https://core.telegram.org/api/obtaining_api_id#obtaining-api-id))
    1. Log into https://my.telegram.org/apps
    2. Fill out the form to create an application
+   3. Or, if you want to go against Telegram's EULA for your convenience, you can leave them blank to use Telegram's official client's API hash at your own risk.
 2. Choose which type of account to log in:
    1. **Bot account**: Create a bot using the [@BotFather](https://t.me/BotFather) bot.
    2. **Self-bot account**: Leave `bot_token` blank, it will prompt you to login. You should only use a self-bot when you're not the admin of the channel (because inviting a bot requires admin access). 
