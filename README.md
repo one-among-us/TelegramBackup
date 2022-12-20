@@ -40,7 +40,7 @@ Using this method, it can automatically update the channel backup incrementally,
 
 ```toml
 # Telegram API id
-api_id = 00000000
+api_id = 10000000
 
 # Telegram API hash
 api_hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
