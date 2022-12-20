@@ -1,8 +1,15 @@
 # TelegramBackup
 
-This is the Telegram adapter for [tg-blog](https://github.com/one-among-us/tg-blog), a front-end for displaying telegram (or any compatible) channel data as a blog.
-    
-Backup / convert telegram channel / chat data.
+This is the Telegram adapter for [tg-blog](https://github.com/one-among-us/tg-blog), a front-end for displaying telegram (or any compatible) channel data as an interactive web page.
+
+#### Motivation
+
+Telegram has become increasingly fragile, recently [revoking usernames for inactive channels](https://t.me/tginfoen/1471), and often randomly banning regular users misclassified as spam. During the username revoking, many channels of deceased individuals have been remove from public space, no longer accessible using `t.me` links. This tool helps to maintain Telegram channel data in case of an accidental event, and also to publicly display inactive channels that have been revoked.
+
+#### Demos / Examples
+
+* You can add this to your blog so that it syncs with your telegram channel (e.g. [Azalea's Blog](https://aza.moe/life)).
+* You can also use this to back up and display another person's channel (e.g. One Among Us (TODO)).
 
 ## Usage
 
