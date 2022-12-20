@@ -15,6 +15,9 @@ class Config:
 
 
 def load_config(path: str = "config.toml") -> Config:
+    if os.getenv('tgc_config'):
+        return Config(**toml.loads(os.getenv('tgc_config')))
+
     fp = os.getenv('tgc_config_path')
 
     if fp is None or not os.path.isfile(fp):
