@@ -78,3 +78,7 @@ After all setup is complete, you can proceed to running the crawler.
 #### Running the Crawler
 
 Simply run the `tgc` command.
+
+## Automatic Updates using GitHub Actions
+
+TODO
