@@ -82,4 +82,45 @@ Simply run the `tgc` command.
 
 ## Automatic Updates using GitHub Actions
 
-TODO
+If you want to automatically backup/sync telegram channel data using GitHub Actions, you can do this:
+
+1. Create a repo
+2. Add the workflow below to `.github/workflows/tgc.yml`
+3. In the Settings tab, create a secret called `TGC_CONFIG`, and paste your `config.toml` there.
+
+```yml
+name: Telegram Channel Updater
+
+on:
+  schedule:
+      # Time period. This is set to update every 4 hours.
+      # (Visit https://crontab.guru/ if you're confused)
+    - cron: '0 */4 * * *' 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v2
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: python -m pip install tgc
+    
+    - name: Run tgc
+      env:
+        tgc_config: ${{ secrets.TGC_CONFIG }}
+        PYTHONUNBUFFERED: 1
+      run: tgc
+
+    - uses: EndBug/add-and-commit@v7
+      with:
+         default_author: github_actions
+         branch: main
+         branch_mode: create
+         message: '[U] Update channel content'
+```
