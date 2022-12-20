@@ -38,12 +38,12 @@ Using this method, it can automatically update the channel backup incrementally,
 #### Setup API Keys
 
 1. Obtain `api_id` and `api_hash` by creating your Telegram application ([Official Guide](https://core.telegram.org/api/obtaining_api_id#obtaining-api-id))
-   1. Log into https://my.telegram.org/apps
-   2. Fill out the form to create an application
-   3. Or, if you want to go against Telegram's EULA for your convenience, you can leave them blank to use Telegram's official client's API hash at your own risk.
+    1. Log into https://my.telegram.org/apps
+    2. Fill out the form to create an application
+    3. Or, if you want to go against Telegram's EULA for your convenience, you can leave them blank to use Telegram's official client's API hash at your own risk.
 2. Choose which type of account to log in:
-   1. **Bot account**: Create a bot using the [@BotFather](https://t.me/BotFather) bot.
-   2. **Self-bot account**: Leave `bot_token` blank, it will prompt you to login. You should only use a self-bot when you're not the admin of the channel (because inviting a bot requires admin access). 
+    1. **Bot account**: Create a bot using the [@BotFather](https://t.me/BotFather) bot.
+    2. **Self-bot account**: Leave `bot_token` blank, it will prompt you to login. You should only use a self-bot when you're not the admin of the channel (because inviting a bot requires admin access).
 3. Fill in the tokens in `~/.config/tgc/config.toml` as shown below
 
 ```toml
@@ -86,31 +86,53 @@ If you want to automatically backup/sync telegram channel data using GitHub Acti
 
 1. Create a repo
 2. Add the workflow below to `.github/workflows/tgc.yml`
-3. In the Settings tab, create a secret called `TGC_CONFIG`, and paste your `config.toml` there.
+3. Create file `requirements.txt` and write `tgc` in it
+4. In the Settings tab, create a secret called `TGC_CONFIG`, and paste your `config.toml` there.
 
 ```yml
 name: Telegram Channel Updater
 
 on:
   schedule:
-      # Time period. This is set to update every 4 hours.
-      # (Visit https://crontab.guru/ if you're confused)
-    - cron: '0 */4 * * *' 
+    # Time period. This is set to update every 4 hours.
+    # (Visit https://crontab.guru/ if you're confused)
+    - cron: '0 */4 * * *'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    steps:
+  steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v2
       with:
         python-version: "3.11"
+        cache: 'pip'
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: ffmpeg
+        version: 1.0
 
     - name: Install dependencies
-      run: python -m pip install tgc
-    
+      run: |
+        set -xe
+        python -VV
+        python -m pip install tgc
+        yarn global add puppeteer-lottie-cli
+
+    - name: Run tgc
+      env:
+        tgc_config: ${{ secrets.TGC_CONFIG }}
+        PYTHONUNBUFFERED: 1
+      run: |
+        tgc
+
     - name: Run tgc
       env:
         tgc_config: ${{ secrets.TGC_CONFIG }}
@@ -119,8 +141,8 @@ jobs:
 
     - uses: EndBug/add-and-commit@v7
       with:
-         default_author: github_actions
-         branch: main
-         branch_mode: create
-         message: '[U] Update channel content'
+        default_author: github_actions
+        branch: main
+        branch_mode: create
+        message: '[U] Update channel content'
 ```
