@@ -82,7 +82,7 @@ Simply run the `tgc` command.
 
 ## Automatic Updates using GitHub Actions
 
-If you want to automatically backup/sync telegram channel data using GitHub Actions, you can do this:
+If you want to automatically backup/sync telegram channel data using GitHub Actions, you can do this. [Example repo](https://github.com/hykilpikonna/blog-data)
 
 1. Create a repo
 2. Add the workflow below to `.github/workflows/tgc.yml`
