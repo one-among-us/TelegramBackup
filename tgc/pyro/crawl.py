@@ -7,8 +7,9 @@ from PIL import Image
 from hypy_utils import printc, json_stringify, write
 from hypy_utils.dict_utils import remove_keys
 from pyrogram import Client
+from pyrogram.enums import MessageEntityType
 from pyrogram.file_id import FileId
-from pyrogram.types import User, Chat, Message
+from pyrogram.types import User, Chat, Message, MessageEntity, Sticker
 
 from .config import load_config, Config
 from .consts import HTML
@@ -97,6 +98,29 @@ async def process_message(msg: Message, path: Path) -> dict:
     return remove_keys(remove_nones(m), {'file_id', 'file_unique_id'})
 
 
+async def download_custom_emojis(msgs: list[Message], results: list[dict], path: Path):
+    # List custom emoji ids
+    ids = list({e.custom_emoji_id for msg in msgs if msg.text and msg.text.entities for e in msg.text.entities if e.custom_emoji_id})
+    orig_ids = list(ids)
+
+    # Query stickers 200 ids at a time
+    stickers: list[Sticker] = []
+    while ids:
+        stickers += await app.get_custom_emoji_stickers(ids[:200])
+        ids = ids[200:]
+
+    # Download stickers
+    for id, s in zip(orig_ids, stickers):
+        ext = guess_ext(app, FileId.decode(s.file_id).file_type, s.mime_type)
+        op = (await download_media(app, s, path / "emoji", f'{id}{ext}')).absolute().relative_to(path.absolute())
+
+        # Replace sticker paths
+        for r in results:
+            if "text" in r:
+                r['text'] = r['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">', f'<i class="custom-emoji" emoji-src="{op}">{s.emoji}')
+
+
+
 async def process_chat(chat_id: int, path: Path):
     chat: Chat = await app.get_chat(chat_id)
     printc(f"&aChat obtained. Chat name: {chat.title} | Type: {chat.type} | ID: {chat.id}")
@@ -119,6 +143,7 @@ async def process_chat(chat_id: int, path: Path):
 
     # print(msgs)
     results = [await process_message(m, path) for m in msgs]
+    await download_custom_emojis(msgs, results, path)
 
     # Group messages
     results = group_msgs(results)

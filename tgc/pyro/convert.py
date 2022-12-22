@@ -56,7 +56,7 @@ def entity_start_end(text: str, en: MessageEntity) -> tuple[str, str] | None:
         case MessageEntityType.MENTION:
             return f'<a href="https://t.me/{text.strip("@")}">', '</a>'
         case MessageEntityType.CUSTOM_EMOJI:
-            # TODO: Download emoji to the right place
+            # This will be replaced later
             return f'<i class="custom-emoji" emoji-src="emoji/{en.custom_emoji_id}">', '</i>'
         case MessageEntityType.PRE:
             lang = en.language
