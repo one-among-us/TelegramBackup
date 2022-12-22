@@ -3,6 +3,7 @@ import asyncio
 from pathlib import Path
 
 import uvloop
+from PIL import Image
 from hypy_utils import printc, json_stringify, write
 from hypy_utils.dict_utils import remove_keys
 from pyrogram import Client
@@ -88,7 +89,10 @@ async def process_message(msg: Message, path: Path) -> dict:
     # Move photo to its own key
     if m['file']:
         if m['type'] == 'photo' or (not m['type'] and (m['file'].get('mime_type') or "").startswith("image")):
-            m['image'] = m.pop('file')
+            img = m['image'] = m.pop('file')
+
+            # Read image size
+            img['width'], img['height'] = Image.open(path / img['url']).size
 
     return remove_keys(remove_nones(m), {'file_id', 'file_unique_id'})
 
