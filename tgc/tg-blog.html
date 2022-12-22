@@ -20,12 +20,16 @@
 <body>
 <!-- Template setup -->
 <div id="app">
-  <tg-blog posts-url="./posts.json"></tg-blog>
+  <tg-blog posts-url="./posts.json" :posts-data="posts"></tg-blog>
 </div>
 
 <!-- Vue js setup -->
 <script>
-    Vue.createApp().component("tg-blog", TgBlog.TgBlog).mount('#app')
+    Vue.createApp({
+        data() { return {
+            posts: $$POSTS_DATA$$
+        }}
+    }).component("tg-blog", TgBlog.TgBlog).mount('#app')
 </script>
 </body>
 </html>

@@ -124,7 +124,7 @@ async def process_chat(chat_id: int, path: Path):
     results = group_msgs(results)
 
     write(path / "posts.json", json_stringify(results, indent=2))
-    write(path / "index.html", HTML)
+    write(path / "index.html", HTML.replace("$$POSTS_DATA$$", json_stringify(results)))
 
     printc(f"&aDone! Saved to {path / 'posts.json'}")
 

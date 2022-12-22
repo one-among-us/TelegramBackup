@@ -3,7 +3,7 @@ import json
 import os.path
 from pathlib import Path
 
-from hypy_utils import printc, write
+from hypy_utils import printc, write, json_stringify
 from hypy_utils.dict_utils import remove_nones
 from hypy_utils.file_utils import escape_filename
 
@@ -310,7 +310,7 @@ def run():
     j = [d for d in j if d is not None]
 
     (p / "posts.json").write_text(json.dumps(j, indent=2, ensure_ascii=False))
-    write(p / "index.html", HTML)
+    write(p / "index.html", HTML.replace("$$POSTS_DATA$$", json_stringify(j)))
 
     printc(f"&aDone! Saved to {p / 'posts.json'}")
 
