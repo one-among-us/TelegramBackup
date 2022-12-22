@@ -19,6 +19,13 @@ def convert_media_dict(msg: Message) -> dict:
     if d:
         d['media_type'] = MEDIA_TYPE_MAP.get(msg.media)
 
+    # Move location to one place
+    if msg.venue:
+        d.pop('location', None)
+        if msg.venue.location:
+            d['longitude'] = msg.venue.location.longitude
+            d['latitude'] = msg.venue.location.latitude
+
     return d
 
 
