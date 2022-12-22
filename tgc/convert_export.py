@@ -3,11 +3,12 @@ import json
 import os.path
 from pathlib import Path
 
-from hypy_utils import printc
+from hypy_utils import printc, write
 from hypy_utils.dict_utils import remove_nones
 from hypy_utils.file_utils import escape_filename
 
-from tgc.convert_media_types import tgs_to_apng
+from .convert_media_types import tgs_to_apng
+from .pyro.consts import HTML
 
 test_text = [
     "test ",
@@ -309,6 +310,7 @@ def run():
     j = [d for d in j if d is not None]
 
     (p / "posts.json").write_text(json.dumps(j, indent=2, ensure_ascii=False))
+    write(p / "index.html", HTML)
 
     printc(f"&aDone! Saved to {p / 'posts.json'}")
 

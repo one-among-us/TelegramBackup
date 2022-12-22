@@ -47,13 +47,11 @@ Using this method, it can automatically update the channel backup incrementally,
 3. Fill in the tokens in `~/.config/tgc/config.toml` as shown below
 
 ```toml
-# Telegram API id
+# Telegram API id & hash
 api_id = 10000000
-
-# Telegram API hash
 api_hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-# Telegram bot token (can be blank)
+# Telegram bot token (leave blank to log into self-bot account)
 bot_token = "0000000000:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 ```
 
@@ -68,10 +66,8 @@ After setting up the keys, you can proceed to setting up the channel:
 ```toml
 # One export entry in a list of exports
 [[exports]]
-# Telegram chat id
-chat_id = -1001191767119
-# Output Path
-path = "exports/hykilp"
+chat_id = -1001191767119    # Telegram channel chat id
+path = "exports/hykilp"     # Output Path
 ```
 
 After all setup is complete, you can proceed to running the crawler.

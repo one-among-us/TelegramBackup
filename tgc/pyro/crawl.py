@@ -7,11 +7,11 @@ from PIL import Image
 from hypy_utils import printc, json_stringify, write
 from hypy_utils.dict_utils import remove_keys
 from pyrogram import Client
-from pyrogram.enums import MessageServiceType, MessageMediaType
 from pyrogram.file_id import FileId
 from pyrogram.types import User, Chat, Message
 
 from .config import load_config, Config
+from .consts import HTML
 from .convert import convert_text, convert_media_dict
 from .download_media import download_media, has_media, guess_ext, download_media_urlsafe
 from .grouper import group_msgs
@@ -123,6 +123,9 @@ async def process_chat(chat_id: int, path: Path):
     results = group_msgs(results)
 
     write(path / "posts.json", json_stringify(results, indent=2))
+    write(path / "index.html", HTML)
+
+    printc(f"&aDone! Saved to {path / 'posts.json'}")
 
 
 async def run_app():

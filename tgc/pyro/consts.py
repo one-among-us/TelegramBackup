@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pyrogram.enums import MessageMediaType
 
 MEDIA_TYPE_MAP: dict[MessageMediaType, str] = {
@@ -17,3 +19,5 @@ MEDIA_TYPE_MAP: dict[MessageMediaType, str] = {
     MessageMediaType.LOCATION: "location",
     MessageMediaType.VENUE: "location"
 }
+
+HTML = (Path(__file__).parent.parent / "tg-blog.html").read_text()
