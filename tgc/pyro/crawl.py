@@ -65,9 +65,9 @@ async def process_message(msg: Message, path: Path) -> dict:
     }
 
     # Download file
+    f = m.get('file')
     if has_media(msg):
         fp, name = await download_media_urlsafe(app, msg, directory=media_path)
-        f = m['file']
         f['original_name'] = name
 
         # Convert tgs sticker
@@ -86,8 +86,8 @@ async def process_message(msg: Message, path: Path) -> dict:
             del f['thumbs']
 
     # Move photo to its own key
-    if m['file']:
-        if m['type'] == 'photo' or (not m['type'] and (m['file'].get('mime_type') or "").startswith("image")):
+    if f:
+        if f['media_type'] == 'photo' or (not f['media_type'] and (m['file'].get('mime_type') or "").startswith("image")):
             img = m['image'] = m.pop('file')
 
             # Read image size
