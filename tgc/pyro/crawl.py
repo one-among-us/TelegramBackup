@@ -75,6 +75,7 @@ async def process_message(msg: Message, path: Path) -> dict:
             fp = Path(tgs_to_apng(fp))
 
         f['url'] = str(fp.absolute().relative_to(path.absolute()))
+        f['size'] = f.pop('file_size', None)
 
         # Download the largest thumbnail
         if f.get('thumbs'):
