@@ -1,6 +1,8 @@
 import argparse
 import json
 import os.path
+import shutil
+import urllib.parse
 from pathlib import Path
 
 from hypy_utils import printc, write, json_stringify
@@ -115,26 +117,21 @@ def process_file_path(path: str | None) -> str | None:
     if path.endswith(".tgs"):
         path = str(tgs_to_apng(p / path).relative_to(p))
 
-    url = escape_filename(path)
-    if url == path:
-        return path
-
-    # Move file
-    if os.path.islink(p / url):
-        os.unlink(p / url)
-    os.symlink((p / path).relative_to((p / url).parent), p / url)
-    return url
+    return path
 
 
 def parse_file(d: dict) -> dict | None:
     file = d.get("file")
     if file is None:
         return None
-    return {
+
+    # Create file
+    file = {
         "url": process_file_path(file),
         "thumb": process_file_path(d.get("thumbnail")),
         "mime_type": d.get("mime_type"),
         "size": os.path.getsize(p / file),
+        "original_name": d.get("original_name"),
 
         # Media
         "media_type": d.get("media_type"),
@@ -153,6 +150,12 @@ def parse_file(d: dict) -> dict | None:
         "title": d.get("title"),
         "performer": d.get("performer")
     }
+
+    # Convert image file to photo
+    if not file['media_type'] and file['mime_type'].startswith('image'):
+        file['media_type'] = "photo"
+
+    return file
 
 
 def get_image(d: dict) -> dict:
@@ -279,6 +282,23 @@ groups: dict[int, list[dict]]
 processed_groups: dict[int, int]
 
 
+def convert_original_filenames(json_path: Path):
+    """
+    Convert filenames in the original result.json
+    """
+    results = json.loads(json_path.read_text())
+    for k in ['file', 'thumbnail']:
+        for r in [r for r in results['messages'] if k in r]:
+            f = p / r[k]
+            new = f.with_name(f"{r['id']}{'_thumb' if k == 'thumbnail' else ''}{f.suffix}")
+            if new != f:
+                shutil.move(f, new)
+                if k == 'file':
+                    r['original_name'] = f.name
+                r[k] = new.relative_to(p)
+    write(json_path, json_stringify(results, indent=2))
+
+
 def run():
     global p, id_map, groups, processed_groups
     parser = argparse.ArgumentParser("Telegram export converter",
@@ -289,6 +309,9 @@ def run():
     p = Path(args.dir)
     f = p / "result.json"
     assert f.is_file(), f"Error: File {f} not found"
+
+    # Convert file names to url-safe file names
+    convert_original_filenames(f)
 
     # Read export result json
     j: list[dict] = json.loads(f.read_text())["messages"]
@@ -309,7 +332,7 @@ def run():
     j = [convert_msg(d) for d in j]
     j = [d for d in j if d is not None]
 
-    (p / "posts.json").write_text(json.dumps(j, indent=2, ensure_ascii=False))
+    write(p / "posts.json", json_stringify(j, indent=2))
     write(p / "index.html", HTML.replace("$$POSTS_DATA$$", json_stringify(j)))
 
     printc(f"&aDone! Saved to {p / 'posts.json'}")
