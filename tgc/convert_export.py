@@ -227,6 +227,10 @@ def convert_msg(d: dict) -> dict | None:
         # TODO: Add more fields
     }
 
+    # Convert image file group to photo group
+    if msg.get('files') and msg['files'][0]['media_type'] == 'photo':
+        msg['images'] = msg.pop('files')
+
     return remove_nones(msg)
 
 
