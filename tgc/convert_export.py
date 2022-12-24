@@ -290,16 +290,31 @@ def convert_original_filenames(json_path: Path):
     """
     Convert filenames in the original result.json
     """
+    renamed: dict[str, str] = {}
     results = json.loads(json_path.read_text())
+
+    if results.get('processed'):
+        return
+
     for k in ['file', 'thumbnail']:
         for r in [r for r in results['messages'] if k in r]:
+            orig = str(r[k])
+            if orig in renamed:
+                r[k] = renamed[orig]
+                continue
+
             f = p / r[k]
             new = f.with_name(f"{r['id']}{'_thumb' if k == 'thumbnail' else ''}{f.suffix}")
+            np = str(new.relative_to(p))
             if new != f:
+                printc(f"&6Renaming &r{orig} &6to &r{np}")
                 shutil.move(f, new)
                 if k == 'file':
                     r['original_name'] = f.name
-                r[k] = new.relative_to(p)
+                r[k] = np
+                renamed[orig] = np
+    results['processed'] = True
+
     write(json_path, json_stringify(results, indent=2))
 
 
