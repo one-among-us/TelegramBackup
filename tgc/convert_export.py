@@ -2,12 +2,11 @@ import argparse
 import json
 import os.path
 import shutil
-import urllib.parse
 from pathlib import Path
+from subprocess import check_call, CalledProcessError
 
 from hypy_utils import printc, write, json_stringify
 from hypy_utils.dict_utils import remove_nones
-from hypy_utils.file_utils import escape_filename
 
 from .convert_media_types import tgs_to_apng
 from .pyro.consts import HTML
@@ -154,6 +153,18 @@ def parse_file(d: dict) -> dict | None:
     # Convert image file to photo
     if not file['media_type'] and file['mime_type'].startswith('image'):
         file['media_type'] = "photo"
+
+    # Add image for missing album cover art
+    if file['media_type'] == 'audio_file' and not file['thumb']:
+        printc(f"&6Trying to retrieve album art for {file}")
+        try:
+            fp = p / file['url']
+            op = fp.with_name(fp.stem + '_thumb.png')
+            check_call(['ffmpeg', '-y', '-i', fp, '-an', '-c:v', 'copy', op])
+            file['thumb'] = op.relative_to(p)
+            printc(f"&aSuccess! Saved to {op}")
+        except CalledProcessError as e:
+            printc(f"&cFailed to extract album art: {e}")
 
     return file
 
