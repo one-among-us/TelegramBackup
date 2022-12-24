@@ -51,6 +51,8 @@ def entity_start_end(text: str, en: MessageEntity) -> tuple[str, str] | None:
             return '<span class="spoiler"><span>', '</span></span>'
         case MessageEntityType.TEXT_LINK:
             return f'<a href="{en.url}">', '</a>'
+        case MessageEntityType.URL:
+            return f'<a href="{text}">', '</a>'
         case MessageEntityType.HASHTAG:
             return f'<a href="#{text}">', '</a>'
         case MessageEntityType.MENTION:
