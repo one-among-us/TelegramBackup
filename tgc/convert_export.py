@@ -56,8 +56,8 @@ def convert_text(text: str | list[dict | str] | None) -> str | None:
                     return f"<b>{t}</b>"
                 case "spoiler":
                     return f'<span class="spoiler"><span>{t}</span></span>'
-                # case "link":
-                #     return f'<a href="{t}">{t}</a>'
+                case "link":
+                    return f'<a href="{t}">{t}</a>'
                 # case "mention_name":
                 #     id = e['user_id']
                 #     return f'<a href="https://t.me/{id}">{t}</a>'
