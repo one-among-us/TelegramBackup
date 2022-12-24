@@ -56,7 +56,7 @@ def group_msgs(msgs: list[dict]) -> list[dict]:
         m['reply'] = {
             'id': rm['id'],
             'text': rm.get('text'),
-            'thumb': ((rm.get('files') or [None])[0] or {}).get('thumbnail')
+            'thumb': ((rm.get('files') or rm.get('images') or [None])[0] or {}).get('thumbnail')
         }
 
     # Add non-grouped messages to results
