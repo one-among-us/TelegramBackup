@@ -7,9 +7,8 @@ from PIL import Image
 from hypy_utils import printc, json_stringify, write
 from hypy_utils.dict_utils import remove_keys
 from pyrogram import Client
-from pyrogram.enums import MessageEntityType
 from pyrogram.file_id import FileId
-from pyrogram.types import User, Chat, Message, MessageEntity, Sticker
+from pyrogram.types import User, Chat, Message, Sticker
 
 from .config import load_config, Config
 from .consts import HTML
@@ -118,7 +117,6 @@ async def download_custom_emojis(msgs: list[Message], results: list[dict], path:
         for r in results:
             if "text" in r:
                 r['text'] = r['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">', f'<i class="custom-emoji" emoji-src="{op}">{s.emoji}')
-
 
 
 async def process_chat(chat_id: int, path: Path):
