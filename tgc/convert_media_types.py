@@ -2,7 +2,7 @@ import os
 import zlib
 from pathlib import Path
 from shutil import which
-from subprocess import check_call
+from subprocess import check_call, CalledProcessError, check_output
 
 from hypy_utils import printc
 
@@ -79,3 +79,17 @@ def webm_to_apng(webm: str, p: Path) -> str:
         check_call(cmd)
 
     return out
+
+
+def extract_album_art(f: Path) -> Path | None:
+    f = Path(f)
+    op = f.with_name(f.stem + '_thumb.png')
+    if op.is_file():
+        return op
+
+    try:
+        check_output(['ffmpeg', '-y', '-i', f, '-an', '-vf', 'scale=250:-1', op])
+        printc(f"&a> Success! Saved to {op}")
+        return op
+    except CalledProcessError as e:
+        printc(f"&c> Failed to extract album art: {e}")

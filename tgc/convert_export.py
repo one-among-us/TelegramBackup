@@ -8,7 +8,7 @@ from subprocess import check_call, CalledProcessError
 from hypy_utils import printc, write, json_stringify
 from hypy_utils.dict_utils import remove_nones
 
-from .convert_media_types import tgs_to_apng
+from .convert_media_types import tgs_to_apng, extract_album_art
 from .pyro.consts import HTML
 
 test_text = [
@@ -156,15 +156,10 @@ def parse_file(d: dict) -> dict | None:
 
     # Add image for missing album cover art
     if file['media_type'] == 'audio_file' and not file['thumb']:
-        printc(f"&6Trying to retrieve album art for {file}")
-        try:
-            fp = p / file['url']
-            op = fp.with_name(fp.stem + '_thumb.png')
-            check_call(['ffmpeg', '-y', '-i', fp, '-an', '-c:v', 'copy', op])
+        fp = p / file['url']
+        op = extract_album_art(fp)
+        if op:
             file['thumb'] = op.relative_to(p)
-            printc(f"&aSuccess! Saved to {op}")
-        except CalledProcessError as e:
-            printc(f"&cFailed to extract album art: {e}")
 
     return file
 
