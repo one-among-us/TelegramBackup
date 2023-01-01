@@ -9,7 +9,7 @@ Telegram has become increasingly fragile, recently [revoking usernames for inact
 #### Demos / Examples
 
 * You can add this to your blog so that it syncs with your telegram channel (e.g. [Azalea's Blog](https://aza.moe/life)).
-* You can also use this to back up and display another person's channel (e.g. One Among Us (TODO)).
+* You can also use this to back up and display another person's channel (e.g. [donotexist_A's backup on One Among Us](https://www.one-among.us/profile/donotexist_A/backup/telegram)).
 
 ## Usage
 
