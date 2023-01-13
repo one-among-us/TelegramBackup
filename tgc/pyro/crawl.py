@@ -88,7 +88,8 @@ async def process_message(msg: Message, path: Path) -> dict:
 
     # Move photo to its own key
     if f:
-        if f['media_type'] == 'photo' or (not f['media_type'] and (m['file'].get('mime_type') or "").startswith("image")):
+        mt = f.get('media_type')
+        if mt == 'photo' or (not mt and (m['file'].get('mime_type') or "").startswith("image")):
             img = m['image'] = m.pop('file')
 
             # Read image size
