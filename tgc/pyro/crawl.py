@@ -44,7 +44,7 @@ def get_user_name(user: User) -> str:
     return name
 
 
-async def process_message(msg: Message, path: Path) -> dict:
+async def process_message(msg: Message, path: Path, export: dict) -> dict:
     media_path = path / "media"
 
     m = {
@@ -66,8 +66,12 @@ async def process_message(msg: Message, path: Path) -> dict:
 
     # Download file
     f = m.get('file')
-    if has_media(msg):
-        fp, name = await download_media_urlsafe(app, msg, directory=media_path)
+
+    async def dl_media():
+        fp, name = await download_media_urlsafe(app, msg, directory=media_path,
+                                                max_file_size=int((export.get('size_limit_mb') or 0) * 1000_000))
+        if fp is None:
+            return
         f['original_name'] = name
 
         # Convert tgs sticker
@@ -85,6 +89,9 @@ async def process_message(msg: Message, path: Path) -> dict:
                                       fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name)
             f['thumb'] = str(fp.absolute().relative_to(path.absolute()))
             del f['thumbs']
+
+    if has_media(msg):
+        await dl_media()
 
     # Move photo to its own key
     if f:
@@ -120,7 +127,7 @@ async def download_custom_emojis(msgs: list[Message], results: list[dict], path:
                 r['text'] = r['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">', f'<i class="custom-emoji" emoji-src="{op}">{s.emoji}')
 
 
-async def process_chat(chat_id: int, path: Path):
+async def process_chat(chat_id: int, path: Path, export: dict):
     chat: Chat = await app.get_chat(chat_id)
     printc(f"&aChat obtained. Chat name: {chat.title} | Type: {chat.type} | ID: {chat.id}")
 
@@ -141,7 +148,7 @@ async def process_chat(chat_id: int, path: Path):
             break
 
     # print(msgs)
-    results = [await process_message(m, path) for m in msgs]
+    results = [await process_message(m, path, export) for m in msgs]
     await download_custom_emojis(msgs, results, path)
 
     # Group messages
@@ -157,7 +164,7 @@ async def run_app():
     me: User = await app.get_me()
     printc(f"&aLogin success! ID: {me.id} | is_bot: {me.is_bot}")
     for export in cfg.exports:
-        await process_chat(int(export["chat_id"]), Path(export["path"]))
+        await process_chat(int(export["chat_id"]), Path(export["path"]), export)
 
 
 cfg: Config

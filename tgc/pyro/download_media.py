@@ -103,11 +103,18 @@ async def download_media(
         directory: str | Path = "media",
         fname: str | None = None,
         progress: Callable = None,
-        progress_args: tuple = ()
-) -> Path:
+        progress_args: tuple = (),
+        max_file_size: int = 0
+) -> Path | Path:
     directory: Path = ensure_dir(directory)
 
     media = has_media(message)
+
+    # Check filesize
+    fsize = getattr(media, 'file_size', 0)
+    if max_file_size and fsize > max_file_size:
+        print(f"Skipped {fname} because of file size limit ({fsize} > {max_file_size})")
+        return None
 
     file_name, file_id_obj = get_file_name(client, message)
     file_name = fname or file_name
@@ -119,7 +126,7 @@ async def download_media(
     print(f"Downloading {p.name}...")
 
     return Path(await client.handle_download(
-        (file_id_obj, directory, file_name, False, getattr(media, "file_size", 0), progress, progress_args)
+        (file_id_obj, directory, file_name, False, fsize, progress, progress_args)
     ))
 
 
@@ -129,7 +136,8 @@ async def download_media_urlsafe(
         directory: str | Path = "media",
         fname: str | None = None,
         progress: Callable = None,
-        progress_args: tuple = ()
+        progress_args: tuple = (),
+        max_file_size: int = 0
 ) -> tuple[Path, str]:
     """
     Download media into a renamed file
@@ -138,4 +146,4 @@ async def download_media_urlsafe(
     """
     file_name, file_id_obj = get_file_name(client, message)
     renamed = str(message.id) + Path(file_name).suffix
-    return await download_media(client, message, directory, renamed, progress, progress_args), file_name
+    return await download_media(client, message, directory, renamed, progress, progress_args, max_file_size), file_name

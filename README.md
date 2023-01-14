@@ -76,6 +76,14 @@ After all setup is complete, you can proceed to running the crawler.
 
 Simply run the `tgc` command.
 
+## Additional Config
+
+You can set additional configuration for each export entry like below:
+
+| Field           | Description                                   | Type  |
+|-----------------|-----------------------------------------------|-------|
+| `size_limit_mb` | Limit downloaded file size (skip large files) | float |
+
 ## Automatic Updates using GitHub Actions
 
 If you want to automatically backup/sync telegram channel data using GitHub Actions, you can do this.
@@ -83,3 +91,4 @@ If you want to automatically backup/sync telegram channel data using GitHub Acti
 1. Create your `config.toml`
 2. Make a fork of https://github.com/hykilpikonna/blog-data
 3. In GitHub's Settings tab, create a secret called `TGC_CONFIG`, and paste your `config.toml` there.
+4. Remember to set a `size_limit_mb` to below 100 so that git lfs won't warn you for pushing large files.
