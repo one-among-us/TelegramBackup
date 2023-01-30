@@ -19,7 +19,7 @@ NODE_BIN_PATHS: list[Path] = [
 ]
 
 
-def find_node_bin(name: str, pkg_name: str) -> Path:
+def find_node_bin(name: str, pkg_name: str) -> Path | None:
     # Find bin path
     path = which(name)
     if path and os.path.isfile(path):
@@ -29,9 +29,9 @@ def find_node_bin(name: str, pkg_name: str) -> Path:
         if (bin / name).is_file():
             return bin / name
 
-    printc(f"&cError! Cannot find node executable {name}. \n"
+    printc(f"&eWarning! Cannot find node executable {name}. \n"
            f"Make sure to install it using 'yarn global add {pkg_name}'")
-    exit(3)
+    return None
 
 
 def tgs_to_apng(tgs: str | Path) -> Path:
@@ -50,7 +50,10 @@ def tgs_to_apng(tgs: str | Path) -> Path:
         json.write_bytes(zlib.decompress(tgs.read_bytes(), 15 + 32))
 
         # Convert json to apng
-        check_call([find_node_bin("puppeteer-lottie", "puppeteer-lottie-cli"), '-i', json, '-o', out])
+        lottie = find_node_bin("puppeteer-lottie", "puppeteer-lottie-cli")
+        if lottie is None:
+            return tgs
+        check_call([lottie, '-i', json, '-o', out])
 
         # Delete json
         os.remove(json)
