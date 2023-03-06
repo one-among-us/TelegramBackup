@@ -106,8 +106,11 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
 
 
 async def download_custom_emojis(msgs: list[Message], results: list[dict], path: Path):
+    print("Downloading custom emojis...")
     # List custom emoji ids
-    ids = list({e.custom_emoji_id for msg in msgs if msg.text and msg.text.entities for e in msg.text.entities if e.custom_emoji_id})
+    ids = {e.custom_emoji_id for msg in msgs if msg.text and msg.text.entities for e in msg.text.entities if e.custom_emoji_id}
+    ids.update({e.custom_emoji_id for msg in msgs if msg.caption_entities for e in msg.caption_entities if e.custom_emoji_id})
+    ids = list(ids)
     orig_ids = list(ids)
 
     # Query stickers 200 ids at a time
@@ -124,7 +127,8 @@ async def download_custom_emojis(msgs: list[Message], results: list[dict], path:
         # Replace sticker paths
         for r in results:
             if "text" in r:
-                r['text'] = r['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">', f'<i class="custom-emoji" emoji-src="{op}">{s.emoji}')
+                r['text'] = r['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">',
+                                              f'<i class="custom-emoji" emoji-src="{op}">{s.emoji}')
 
 
 async def process_chat(chat_id: int, path: Path, export: dict):
