@@ -84,6 +84,23 @@ You can set additional configuration for each export entry like below:
 |-----------------|-----------------------------------------------|-------|
 | `size_limit_mb` | Limit downloaded file size (skip large files) | float |
 
+### RSS Feed Generation
+
+If you want to generate RSS feed, you can add the following under the export entry:
+
+```toml
+[[exports]]
+chat_id = -1001191767119    # Telegram channel chat id
+path = "exports/hykilp"     # Output Path
+
+[exports.rss]
+title = "小桂桂的回忆录 📒"
+link = "https://aza.moe/life"
+description = "「我们所经历的每个平凡的日常，也许就是连续发生的奇迹」"
+language = "zh-cn"
+image_url = "https://aza.moe/meru_256px.png"
+```
+
 ## Automatic Updates using GitHub Actions
 
 If you want to automatically backup/sync telegram channel data using GitHub Actions, you can do this.
