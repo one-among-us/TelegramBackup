@@ -17,6 +17,7 @@ from .download_media import download_media, has_media, guess_ext, download_media
 from .grouper import group_msgs
 from ..convert_export import remove_nones
 from ..convert_media_types import tgs_to_apng
+from ..rss.posts_to_feed import posts_to_feed, FeedMeta
 
 uvloop.install()
 
@@ -160,6 +161,10 @@ async def process_chat(chat_id: int, path: Path, export: dict):
 
     write(path / "posts.json", json_stringify(results, indent=2))
     write(path / "index.html", HTML.replace("$$POSTS_DATA$$", json_stringify(results)))
+
+    if 'rss' in export:
+        print("Exporting RSS feed...")
+        posts_to_feed(path, FeedMeta(**export['rss']))
 
     printc(f"&aDone! Saved to {path / 'posts.json'}")
 
