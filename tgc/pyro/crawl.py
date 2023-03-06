@@ -129,7 +129,7 @@ async def download_custom_emojis(msgs: list[Message], results: list[dict], path:
         for r in results:
             if "text" in r:
                 r['text'] = r['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">',
-                                              f'<i class="custom-emoji" emoji-src="{op}">{s.emoji}')
+                                              f'<i class="custom-emoji" emoji-src="{op}">')
 
 
 async def process_chat(chat_id: int, path: Path, export: dict):
