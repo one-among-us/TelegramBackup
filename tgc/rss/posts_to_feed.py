@@ -7,6 +7,7 @@ from pathlib import Path
 from dateutil import parser
 from feedgen.feed import FeedGenerator
 from html2text import html2text
+from markdown import markdown
 
 
 @dataclass
@@ -45,8 +46,9 @@ def posts_to_feed(path: Path, meta: FeedMeta):
         fe.updated(parser.parse(post['date']).replace(tzinfo=timezone.utc))
 
         # Escape HTML tags
-        text = html2text(post.get('text', post.get('caption', ''))).replace('\n', '<br>')
-        text = html.escape(text)
+        # text = html2text(markdown(post.get('text') or post.get('caption') or ''), bodywidth=0)
+        # text = html.escape(text.replace('\n', '<br>'))
+        text = markdown(post.get('text') or post.get('caption') or '')
         fe.description(text)
 
     fg.rss_file(path / 'rss.xml', pretty=True)
