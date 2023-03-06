@@ -1,4 +1,3 @@
-import html
 import json
 from dataclasses import dataclass
 from datetime import timezone
@@ -6,7 +5,6 @@ from pathlib import Path
 
 from dateutil import parser
 from feedgen.feed import FeedGenerator
-from html2text import html2text
 from markdown import markdown
 
 
