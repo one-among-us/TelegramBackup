@@ -159,3 +159,7 @@ test
 exports
 .DS_Store
 ._*
+
+# Nix Flakes
+result
+result-*
