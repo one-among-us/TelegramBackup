@@ -59,7 +59,11 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
         "forwarded_from": {
             "name": get_user_name(msg.forward_from),
             "url": f'https://t.me/{msg.forward_from.username}' if msg.forward_from.username else None,
-        } if msg.forward_from else None,
+        } if msg.forward_from else {
+            "name": msg.forward_from_chat.title,
+        } if msg.forward_from_chat else {
+            "name": msg.forward_sender_name,
+        } if msg.forward_sender_name else None,
         "media_group_id": msg.media_group_id,
         "reply_id": msg.reply_to_message_id,
         "file": convert_media_dict(msg)
