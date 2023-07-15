@@ -18,6 +18,8 @@ def convert_media_dict(msg: Message) -> dict:
     d = deep_dict(helper(), {'_client'})
     if d:
         d['media_type'] = MEDIA_TYPE_MAP.get(msg.media)
+        if msg.has_media_spoiler:
+            d['spoiler'] = True
 
     # Move location to one place
     if msg.venue:
