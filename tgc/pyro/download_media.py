@@ -15,6 +15,7 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+import asyncio
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -23,6 +24,7 @@ from typing import Callable, Any
 from hypy_utils import ensure_dir, md5
 from hypy_utils.file_utils import escape_filename
 from pyrogram import types, Client
+from pyrogram.errors import FloodWait
 from pyrogram.file_id import FileId, FileType, PHOTO_TYPES
 from pyrogram.types import Message
 
@@ -125,9 +127,14 @@ async def download_media(
 
     print(f"Downloading {p.name}...")
 
-    return Path(await client.handle_download(
-        (file_id_obj, directory, file_name, False, fsize, progress, progress_args)
-    ))
+    while True:
+        try:
+            return Path(await client.handle_download(
+                (file_id_obj, directory, file_name, False, fsize, progress, progress_args)
+            ))
+        except FloodWait as e:
+            print(f"Sleeping for {e.value} seconds...")
+            await asyncio.sleep(e.value)
 
 
 async def download_media_urlsafe(
