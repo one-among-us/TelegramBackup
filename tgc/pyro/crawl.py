@@ -182,12 +182,6 @@ app: Client
 
 
 def run():
-    try:
-        import uvloop
-        uvloop.install()
-    except ImportError:
-        printc("&3uvloop not installed, using default asyncio event loop")
-
     global app, cfg
     parser = argparse.ArgumentParser("Telegram Channel Message to Public API Crawler")
     parser.add_argument("config", help="Config path", nargs="?", default="config.toml")
