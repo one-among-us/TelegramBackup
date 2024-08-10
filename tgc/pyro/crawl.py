@@ -2,7 +2,6 @@ import argparse
 import asyncio
 from pathlib import Path
 
-import uvloop
 from PIL import Image
 from hypy_utils import printc, json_stringify, write
 from hypy_utils.dict_utils import remove_keys
@@ -18,8 +17,6 @@ from .grouper import group_msgs
 from ..convert_export import remove_nones
 from ..convert_media_types import tgs_to_apng
 from ..rss.posts_to_feed import posts_to_feed, FeedMeta
-
-uvloop.install()
 
 
 def effective_text(msg: Message) -> str:
@@ -185,6 +182,12 @@ app: Client
 
 
 def run():
+    try:
+        import uvloop
+        uvloop.install()
+    except ImportError:
+        printc("&3uvloop not installed, using default asyncio event loop")
+
     global app, cfg
     parser = argparse.ArgumentParser("Telegram Channel Message to Public API Crawler")
     parser.add_argument("config", help="Config path", nargs="?", default="config.toml")
