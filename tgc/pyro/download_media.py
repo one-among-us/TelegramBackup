@@ -96,6 +96,11 @@ def get_file_name(client: Client, message: Message) -> tuple[str, FileId]:
         file_name += guess_ext(client, file_type, mime_type)
     file_name = escape_filename(file_name)
 
+    # Sometimes, if the file name is too long, the file extension is stripped by telegram api
+    # We need to add it back
+    if '.' not in file_name:
+        file_name += guess_ext(client, file_type, mime_type)
+
     return file_name, file_id_obj
 
 
