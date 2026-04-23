@@ -52,7 +52,7 @@ async def get_forwarded_from(msg: Message) -> dict | None:
             user = await app.get_entity(from_id.user_id)
             return {
                 "name": get_user_name(user),
-                "url": f"https://t.me/{user.username}" if getattr(user, "username", None) else None
+                "url": f"https://t.me/{user.username}" if user.username else None
             }
         except Exception:
             return None
@@ -129,7 +129,7 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
             # Read image size
             img['width'], img['height'] = Image.open(path / img['url']).size
 
-    return remove_keys(remove_nones(m), {'file_reference', 'document', 'video_sizes'})
+    return remove_keys(remove_nones(m), {'file_id', 'file_unique_id', 'file_reference', 'document', 'video_sizes'})
 
 
 async def download_custom_emojis(msgs: list[Message], results: list[dict], path: Path):

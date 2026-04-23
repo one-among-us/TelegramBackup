@@ -39,12 +39,22 @@ def convert_media_dict(msg: Message) -> dict:
             d['spoiler'] = True
         f = getattr(msg, "file", None)
         if f:
-            d['mime_type'] = d.get('mime_type') or getattr(f, "mime_type", None)
-            d['file_size'] = d.get('size') or d.get('file_size') or getattr(f, "size", None)
-            d['width'] = d.get('w') or d.get('width') or getattr(f, "width", None)
-            d['height'] = d.get('h') or d.get('height') or getattr(f, "height", None)
-            d['duration'] = d.get('duration') or getattr(f, "duration", None)
-            d['thumbs'] = d.get('thumbs') or getattr(f, "thumbs", None)
+            d['mime_type'] = d.get('mime_type') if d.get('mime_type') is not None else getattr(f, "mime_type", None)
+
+            size = d.get('size')
+            file_size = d.get('file_size')
+            d['file_size'] = size if size is not None else file_size if file_size is not None else getattr(f, "size", None)
+
+            w = d.get('w')
+            width = d.get('width')
+            d['width'] = w if w is not None else width if width is not None else getattr(f, "width", None)
+
+            h = d.get('h')
+            height = d.get('height')
+            d['height'] = h if h is not None else height if height is not None else getattr(f, "height", None)
+
+            d['duration'] = d.get('duration') if d.get('duration') is not None else getattr(f, "duration", None)
+            d['thumbs'] = d.get('thumbs') if d.get('thumbs') is not None else getattr(f, "thumbs", None)
 
     # Move location to one place
     if msg.venue:

@@ -19,7 +19,11 @@ def guess_ext(mime_type: str | None, fallback: str = ".unknown") -> str:
 
 def has_media(message: Message | Any) -> Any | None:
     if isinstance(message, Message):
-        return message.media
+        for attr in ("audio", "document", "photo", "sticker", "gif", "video", "voice", "video_note"):
+            media = getattr(message, attr, None)
+            if media is not None:
+                return media
+        return None
     return message
 
 
@@ -52,7 +56,8 @@ async def download_media(
     if media is None:
         return None
 
-    fsize = getattr(getattr(message, "file", None), "size", None) or getattr(message, "size", 0)
+    file = getattr(message, "file", None)
+    fsize = getattr(file, "size", None) if file else getattr(message, "size", 0)
     if max_file_size and fsize and fsize > max_file_size:
         print(f"Skipped {fname} because of file size limit ({fsize} > {max_file_size})")
         return None
