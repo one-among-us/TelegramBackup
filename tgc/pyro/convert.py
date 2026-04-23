@@ -1,79 +1,102 @@
-from hypy_utils.dict_utils import deep_dict
-from pyrogram.enums import MessageEntityType
-from pyrogram.parser import utils
-from pyrogram.types import MessageEntity, Message
+from typing import Any
 
-from tgc.pyro.consts import MEDIA_TYPE_MAP
+from hypy_utils.dict_utils import deep_dict
+from telethon.helpers import add_surrogate, del_surrogate
+from telethon.tl.custom.message import Message
+from telethon.tl.types import (
+    MessageEntityBold,
+    MessageEntityBlockquote,
+    MessageEntityCode,
+    MessageEntityCustomEmoji,
+    MessageEntityHashtag,
+    MessageEntityItalic,
+    MessageEntityMention,
+    MessageEntityPre,
+    MessageEntitySpoiler,
+    MessageEntityStrike,
+    MessageEntityTextUrl,
+    MessageEntityUnderline,
+    MessageEntityUrl,
+)
+
+from tgc.pyro.consts import MEDIA_ATTR_MAP
 
 
 def convert_media_dict(msg: Message) -> dict:
     def helper():
-        for f in ['photo', 'video', 'audio', 'voice', 'document', 'sticker', 'animation', 'video_note', 'contact',
-                  'location', 'venue', 'poll', 'web_page']:
+        for f in ['photo', 'video', 'audio', 'voice', 'document', 'sticker', 'gif', 'video_note', 'contact',
+                  'geo', 'venue', 'poll', 'web_preview']:
             dct = getattr(msg, f, None)
             if dct:
-                return dict(vars(dct))
+                d = dict(vars(dct))
+                d['media_type'] = MEDIA_ATTR_MAP.get(f)
+                return d
         return {}
 
     d = deep_dict(helper(), {'_client'})
     if d:
-        d['media_type'] = MEDIA_TYPE_MAP.get(msg.media)
-        if msg.has_media_spoiler:
+        if getattr(msg.media, "spoiler", False):
             d['spoiler'] = True
+        f = getattr(msg, "file", None)
+        if f:
+            d['mime_type'] = d.get('mime_type') or getattr(f, "mime_type", None)
+            d['file_size'] = d.get('size') or d.get('file_size') or getattr(f, "size", None)
+            d['width'] = d.get('w') or d.get('width') or getattr(f, "width", None)
+            d['height'] = d.get('h') or d.get('height') or getattr(f, "height", None)
+            d['duration'] = d.get('duration') or getattr(f, "duration", None)
+            d['thumbs'] = d.get('thumbs') or getattr(f, "thumbs", None)
 
     # Move location to one place
     if msg.venue:
-        d.pop('location', None)
-        if msg.venue.location:
-            d['longitude'] = msg.venue.location.longitude
-            d['latitude'] = msg.venue.location.latitude
+        d.pop('geo', None)
+        if msg.venue.geo:
+            d['longitude'] = msg.venue.geo.long
+            d['latitude'] = msg.venue.geo.lat
 
     return d
 
 
-def entity_start_end(text: str, en: MessageEntity) -> tuple[str, str] | None:
+def entity_start_end(text: str, en: Any) -> tuple[str, str] | None:
     """
     Convert a message entity to a start tag and an end tag for HTML
     """
     text = text[en.offset:en.offset + en.length]
-    match en.type:
-        case MessageEntityType.STRIKETHROUGH:
-            return "<del>", "</del>"
-        case MessageEntityType.CODE:
-            return "<code>", "</code>"
-        case MessageEntityType.ITALIC:
-            return "<em>", "</em>"
-        case MessageEntityType.UNDERLINE:
-            return "<u>", "</u>"
-        case MessageEntityType.BOLD:
-            return "<b>", "</b>"
-        case MessageEntityType.BLOCKQUOTE:
-            return "<blockquote>", "</blockquote>"
-        case MessageEntityType.SPOILER:
-            return '<span class="spoiler"><span>', '</span></span>'
-        case MessageEntityType.TEXT_LINK:
-            return f'<a href="{en.url}">', '</a>'
-        case MessageEntityType.URL:
-            return f'<a href="{text}">', '</a>'
-        case MessageEntityType.HASHTAG:
-            return f'<a href="#{text}">', '</a>'
-        case MessageEntityType.MENTION:
-            return f'<a href="https://t.me/{text.strip("@")}">', '</a>'
-        case MessageEntityType.CUSTOM_EMOJI:
-            # This will be replaced later
-            return f'<i class="custom-emoji" emoji-src="emoji/{en.custom_emoji_id}">', '</i>'
-        case MessageEntityType.PRE:
-            lang = en.language
-            return f'<pre language="{lang}">' if lang else f"<pre>", f"</pre>"
-        case _:
-            return None
+    if isinstance(en, MessageEntityStrike):
+        return "<del>", "</del>"
+    if isinstance(en, MessageEntityCode):
+        return "<code>", "</code>"
+    if isinstance(en, MessageEntityItalic):
+        return "<em>", "</em>"
+    if isinstance(en, MessageEntityUnderline):
+        return "<u>", "</u>"
+    if isinstance(en, MessageEntityBold):
+        return "<b>", "</b>"
+    if isinstance(en, MessageEntityBlockquote):
+        return "<blockquote>", "</blockquote>"
+    if isinstance(en, MessageEntitySpoiler):
+        return '<span class="spoiler"><span>', '</span></span>'
+    if isinstance(en, MessageEntityTextUrl):
+        return f'<a href="{en.url}">', '</a>'
+    if isinstance(en, MessageEntityUrl):
+        return f'<a href="{text}">', '</a>'
+    if isinstance(en, MessageEntityHashtag):
+        return f'<a href="#{text}">', '</a>'
+    if isinstance(en, MessageEntityMention):
+        return f'<a href="https://t.me/{text.strip("@")}">', '</a>'
+    if isinstance(en, MessageEntityCustomEmoji):
+        # This will be replaced later
+        return f'<i class="custom-emoji" emoji-src="emoji/{en.document_id}">', '</i>'
+    if isinstance(en, MessageEntityPre):
+        lang = en.language
+        return f'<pre language="{lang}">' if lang else f"<pre>", f"</pre>"
+    return None
 
 
-def convert_text(text: str, entities: list[MessageEntity]) -> str:
+def convert_text(text: str, entities: list[Any]) -> str:
     """
     Convert text to HTML
     """
-    text = utils.add_surrogates(text)
+    text = add_surrogate(text)
 
     entities_offsets = []
 
@@ -100,4 +123,4 @@ def convert_text(text: str, entities: list[MessageEntity]) -> str:
     for entity, offset in entities_offsets:
         text = text[:offset] + entity + text[offset:]
 
-    return utils.remove_surrogates(text)
+    return del_surrogate(text)

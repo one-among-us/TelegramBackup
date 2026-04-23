@@ -5,34 +5,31 @@ from pathlib import Path
 from PIL import Image
 from hypy_utils import printc, json_stringify, write
 from hypy_utils.dict_utils import remove_keys
-from pyrogram import Client
-from pyrogram.file_id import FileId
-from pyrogram.types import User, Chat, Message, Sticker
+from telethon import TelegramClient, functions
+from telethon.tl.custom.message import Message
+from telethon.tl.types import PeerChannel, PeerUser, User
 
 from .config import load_config, Config
 from .consts import HTML
 from .convert import convert_text, convert_media_dict
-from .download_media import download_media, has_media, guess_ext, download_media_urlsafe
+from .download_media import download_media, has_media, download_media_urlsafe, guess_ext
 from .grouper import group_msgs
 from ..convert_export import remove_nones
 from ..convert_media_types import tgs_to_apng
 from ..rss.posts_to_feed import posts_to_feed, FeedMeta
 
 
-def effective_text(msg: Message) -> str:
+def effective_text(msg: Message) -> str | None:
     """
     Get effective text of a message in HTML
     """
     if msg.text:
-        return convert_text(msg.text, msg.text.entities)
-    if msg.caption:
-        return convert_text(msg.caption, msg.caption.entities)
-    if msg.service:
-        return str(msg.service).split(".")[-1].replace("_", " ").capitalize()
-
-
-def _download_media_helper(args: list) -> Path:
-    return asyncio.run(download_media(app, *args))
+        return convert_text(msg.text, msg.entities or [])
+    if msg.message and msg.entities:
+        return convert_text(msg.message, msg.entities)
+    if msg.action:
+        return str(msg.action).split(".")[-1].replace("_", " ").capitalize()
+    return None
 
 
 def get_user_name(user: User) -> str:
@@ -42,27 +39,46 @@ def get_user_name(user: User) -> str:
     return name
 
 
+async def get_forwarded_from(msg: Message) -> dict | None:
+    fwd = msg.forward
+    if not fwd:
+        return None
+    if getattr(fwd, "from_name", None):
+        return {"name": fwd.from_name}
+
+    from_id = getattr(fwd, "from_id", None)
+    if isinstance(from_id, PeerUser):
+        try:
+            user = await app.get_entity(from_id.user_id)
+            return {
+                "name": get_user_name(user),
+                "url": f"https://t.me/{user.username}" if getattr(user, "username", None) else None
+            }
+        except Exception:
+            return None
+    if isinstance(from_id, PeerChannel):
+        try:
+            chat = await app.get_entity(from_id.channel_id)
+            return {"name": getattr(chat, "title", None)}
+        except Exception:
+            return None
+    return None
+
+
 async def process_message(msg: Message, path: Path, export: dict) -> dict:
     media_path = path / "media"
 
     m = {
         "id": msg.id,
         "date": msg.date,
-        "type": 'service' if msg.service else None,
+        "type": 'service' if msg.action else None,
         "text": effective_text(msg),
-        "author": msg.author_signature,
+        "author": msg.post_author,
         "views": msg.views,
         "forwards": msg.forwards,
-        "forwarded_from": {
-            "name": get_user_name(msg.forward_from),
-            "url": f'https://t.me/{msg.forward_from.username}' if msg.forward_from.username else None,
-        } if msg.forward_from else {
-            "name": msg.forward_from_chat.title,
-        } if msg.forward_from_chat else {
-            "name": msg.forward_sender_name,
-        } if msg.forward_sender_name else None,
-        "media_group_id": msg.media_group_id,
-        "reply_id": msg.reply_to_message_id,
+        "forwarded_from": await get_forwarded_from(msg),
+        "media_group_id": msg.grouped_id,
+        "reply_id": msg.reply_to.reply_to_msg_id if msg.reply_to else None,
         "file": convert_media_dict(msg)
     }
 
@@ -70,8 +86,12 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
     f = m.get('file')
 
     async def dl_media():
-        fp, name = await download_media_urlsafe(app, msg, directory=media_path,
-                                                max_file_size=int((export.get('size_limit_mb') or 0) * 1000_000))
+        fp, name = await download_media_urlsafe(
+            app,
+            msg,
+            directory=media_path,
+            max_file_size=int((export.get('size_limit_mb') or 0) * 1000_000),
+        )
         if fp is None:
             return
         f['original_name'] = name
@@ -85,11 +105,16 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
 
         # Download the largest thumbnail
         if f.get('thumbs'):
-            thumb: dict = max(f['thumbs'], key=lambda x: x['file_size'])
-            ext = guess_ext(app, FileId.decode(thumb['file_id']).file_type, None)
-            fp = await download_media(app, thumb['file_id'], directory=media_path,
-                                      fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name)
-            f['thumb'] = str(fp.absolute().relative_to(path.absolute()))
+            ext = guess_ext(f.get("mime_type"), ".jpg")
+            thumb_fp = await download_media(
+                app,
+                msg,
+                directory=media_path,
+                fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name,
+                thumb=-1,
+            )
+            if thumb_fp:
+                f['thumb'] = str(thumb_fp.absolute().relative_to(path.absolute()))
             del f['thumbs']
 
     if has_media(msg):
@@ -104,56 +129,52 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
             # Read image size
             img['width'], img['height'] = Image.open(path / img['url']).size
 
-    return remove_keys(remove_nones(m), {'file_id', 'file_unique_id'})
+    return remove_keys(remove_nones(m), {'file_reference', 'document', 'video_sizes'})
 
 
 async def download_custom_emojis(msgs: list[Message], results: list[dict], path: Path):
     print("Downloading custom emojis...")
     # List custom emoji ids
-    ids = {e.custom_emoji_id for msg in msgs if msg.text and msg.text.entities for e in msg.text.entities if e.custom_emoji_id}
-    ids.update({e.custom_emoji_id for msg in msgs if msg.caption_entities for e in msg.caption_entities if e.custom_emoji_id})
+    ids = {
+        e.document_id
+        for msg in msgs
+        if msg.entities
+        for e in msg.entities
+        if getattr(e, "document_id", None)
+    }
     ids = list(ids)
-    orig_ids = list(ids)
 
-    # Query stickers 200 ids at a time
-    stickers: list[Sticker] = []
-    while ids:
-        stickers += await app.get_custom_emoji_stickers(ids[:200])
-        ids = ids[200:]
+    if not ids:
+        return
+
+    docs = await app(functions.messages.GetCustomEmojiDocumentsRequest(document_id=ids))
 
     # Download stickers
-    for id, s in zip(orig_ids, stickers):
-        ext = guess_ext(app, FileId.decode(s.file_id).file_type, s.mime_type)
-        op = (await download_media(app, s, path / "emoji", f'{id}{ext}')).absolute().relative_to(path.absolute())
+    for document in docs:
+        id = document.id
+        ext = guess_ext(getattr(document, "mime_type", None), ".webp")
+        op = await download_media(app, document, path / "emoji", f'{id}{ext}')
+        if not op:
+            continue
+        op = op.absolute().relative_to(path.absolute())
 
         # Replace sticker paths
         for r in results:
             if "text" in r:
-                r['text'] = r['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">',
-                                              f'<i class="custom-emoji" emoji-src="{op}">')
+                r['text'] = r['text'].replace(
+                    f'<i class="custom-emoji" emoji-src="emoji/{id}">',
+                    f'<i class="custom-emoji" emoji-src="{op}">'
+                )
 
 
 async def process_chat(chat_id: int, path: Path, export: dict):
-    chat: Chat = await app.get_chat(chat_id)
-    printc(f"&aChat obtained. Chat name: {chat.title} | Type: {chat.type} | ID: {chat.id}")
+    chat = await app.get_entity(chat_id)
+    printc(f"&aChat obtained. Chat name: {getattr(chat, 'title', 'Unknown')} | ID: {getattr(chat, 'id', chat_id)}")
 
-    # Crawl 200 messages each request
     print("Crawling channel posts...")
-    msgs = []
-    for i in range(999):
-        start_idx = i * 200 + 1
-        end_idx = start_idx + 200
+    msgs = [m async for m in app.iter_messages(chat, reverse=True)]
+    print(f"> {len(msgs)} total messages crawled.")
 
-        additional_msgs = await app.get_messages(chat.id, range(start_idx, end_idx))
-        additional_msgs = [m for m in additional_msgs if not m.empty]
-        msgs += additional_msgs
-        print(f"> {len(msgs)} total messages... (up to ID #{end_idx - 1})")
-
-        if not additional_msgs:
-            print("> All 200 messages are empty, we're done.")
-            break
-
-    # print(msgs)
     results = [await process_message(m, path, export) for m in msgs]
     await download_custom_emojis(msgs, results, path)
 
@@ -171,14 +192,14 @@ async def process_chat(chat_id: int, path: Path, export: dict):
 
 
 async def run_app():
-    me: User = await app.get_me()
-    printc(f"&aLogin success! ID: {me.id} | is_bot: {me.is_bot}")
+    me = await app.get_me()
+    printc(f"&aLogin success! ID: {me.id} | is_bot: {me.bot}")
     for export in cfg.exports:
         await process_chat(int(export["chat_id"]), Path(export["path"]), export)
 
 
 cfg: Config
-app: Client
+app: TelegramClient
 
 
 def run():
@@ -188,8 +209,15 @@ def run():
     args = parser.parse_args()
     cfg = load_config(args.config)
 
-    app = Client("Bot", cfg.api_id or 2048, cfg.api_hash or "b18441a1ff607e10a989891a5462e627",
-                 **(dict(bot_token=cfg.bot_token) if cfg.bot_token else {}))
+    app = TelegramClient(
+        "Bot",
+        cfg.api_id or 2048,
+        cfg.api_hash or "b18441a1ff607e10a989891a5462e627",
+    )
 
     with app:
-        asyncio.get_event_loop().run_until_complete(run_app())
+        if cfg.bot_token:
+            app.loop.run_until_complete(app.start(bot_token=cfg.bot_token))
+        else:
+            app.loop.run_until_complete(app.start())
+        app.loop.run_until_complete(run_app())

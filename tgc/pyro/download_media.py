@@ -1,161 +1,88 @@
-#  Pyrogram - Telegram MTProto API Client Library for Python
-#  Copyright (C) 2017-present Dan <https://github.com/delivrance>
-#
-#  This file is part of Pyrogram.
-#
-#  Pyrogram is free software: you can redistribute it and/or modify
-#  it under the terms of the GNU Lesser General Public License as published
-#  by the Free Software Foundation, either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  Pyrogram is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU Lesser General Public License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
-import shutil
+import mimetypes
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Callable, Any
+from typing import Any
 
-from hypy_utils import ensure_dir, md5
+from hypy_utils import ensure_dir
 from hypy_utils.file_utils import escape_filename
-from pyrogram import types, Client
-from pyrogram.errors import FloodWait
-from pyrogram.file_id import FileId, FileType, PHOTO_TYPES
-from pyrogram.types import Message
+from telethon import TelegramClient
+from telethon.errors import FloodWaitError
+from telethon.tl.custom.file import File
+from telethon.tl.custom.message import Message
 
 
-def guess_ext(client: Client, file_type: int, mime_type: str | None) -> str:
-    guessed_extension = client.guess_extension(mime_type) if mime_type else None
-
-    if file_type in PHOTO_TYPES:
-        return ".jpg"
-    elif file_type == FileType.VOICE:
-        return guessed_extension or ".ogg"
-    elif file_type in (FileType.VIDEO, FileType.ANIMATION, FileType.VIDEO_NOTE):
-        return guessed_extension or ".mp4"
-    elif file_type == FileType.DOCUMENT:
-        return guessed_extension or ".zip"
-    elif file_type == FileType.STICKER:
-        return guessed_extension or ".webp"
-    elif file_type == FileType.AUDIO:
-        return guessed_extension or ".mp3"
-    else:
-        return ".unknown"
+def guess_ext(mime_type: str | None, fallback: str = ".unknown") -> str:
+    if not mime_type:
+        return fallback
+    return mimetypes.guess_extension(mime_type) or fallback
 
 
-def has_media(message: Message) -> Any | None:
-    available_media = ("audio", "document", "photo", "sticker", "animation", "video", "voice", "video_note",
-                       "new_chat_photo")
-
-    if isinstance(message, types.Message):
-        for kind in available_media:
-            media = getattr(message, kind, None)
-
-            if media is not None:
-                break
-        else:
-            return None
-    else:
-        media = message
-
-    return media
+def has_media(message: Message | Any) -> Any | None:
+    if isinstance(message, Message):
+        return message.media
+    return message
 
 
-def get_file_name(client: Client, message: Message) -> tuple[str, FileId]:
-    """
-    Guess a file name of a message media
+def get_file_name(message: Message | Any) -> str:
+    if isinstance(message, Message):
+        f: File | None = message.file
+        if f and f.name:
+            return escape_filename(f.name)
+        ext = getattr(f, "ext", None) or guess_ext(getattr(f, "mime_type", None))
+        return escape_filename(f"{message.id}{ext}")
 
-    :param client: Client
-    :param message: Message or media
-    :return: File name, file id object
-    """
-    media = has_media(message)
-
-    if isinstance(media, str):
-        file_id_str = media
-    else:
-        file_id_str = media.file_id
-
-    file_id_obj = FileId.decode(file_id_str)
-    file_type = file_id_obj.file_type
-
-    mime_type = getattr(media, "mime_type", "")
-    date = getattr(media, "date", None)
-
-    file_name = getattr(media, "file_name", None)
-
-    if not file_name:
-        file_name = f"{FileType(file_type).name.lower()}"
-        if date:
-            file_name += f"_{date.strftime('%Y-%m-%d_%H-%M-%S')}"
-        file_name += guess_ext(client, file_type, mime_type)
-    file_name = escape_filename(file_name)
-
-    # Sometimes, if the file name is too long, the file extension is stripped by telegram api
-    # We need to add it back
-    if '.' not in file_name:
-        file_name += guess_ext(client, file_type, mime_type)
-
-    return file_name, file_id_obj
+    file_name = getattr(message, "name", None) or getattr(message, "file_name", None)
+    mime_type = getattr(message, "mime_type", None)
+    if file_name:
+        return escape_filename(file_name)
+    file_id = getattr(message, "id", "file")
+    return escape_filename(f"{file_id}{guess_ext(mime_type)}")
 
 
 async def download_media(
-        client: Client,
-        message: types.Message,
+        client: TelegramClient,
+        message: Message | Any,
         directory: str | Path = "media",
         fname: str | None = None,
-        progress: Callable = None,
-        progress_args: tuple = (),
-        max_file_size: int = 0
-) -> Path | Path:
+        max_file_size: int = 0,
+        thumb: int | None = None
+) -> Path | None:
     directory: Path = ensure_dir(directory)
-
     media = has_media(message)
+    if media is None:
+        return None
 
-    # Check filesize
-    fsize = getattr(media, 'file_size', 0)
-    if max_file_size and fsize > max_file_size:
+    fsize = getattr(getattr(message, "file", None), "size", None) or getattr(message, "size", 0)
+    if max_file_size and fsize and fsize > max_file_size:
         print(f"Skipped {fname} because of file size limit ({fsize} > {max_file_size})")
         return None
 
-    file_name, file_id_obj = get_file_name(client, message)
-    file_name = fname or file_name
-
+    file_name = fname or get_file_name(message)
     p = directory / file_name
     if p.exists():
         return p
 
     print(f"Downloading {p.name}...")
-
     while True:
         try:
-            return Path(await client.handle_download(
-                (file_id_obj, directory, file_name, False, fsize, progress, progress_args)
-            ))
-        except FloodWait as e:
-            print(f"Sleeping for {e.value} seconds...")
-            await asyncio.sleep(e.value)
+            out = await client.download_media(message, file=str(p), thumb=thumb)
+            return Path(out) if out else None
+        except FloodWaitError as e:
+            print(f"Sleeping for {e.seconds} seconds...")
+            await asyncio.sleep(e.seconds)
 
 
 async def download_media_urlsafe(
-        client: Client,
-        message: types.Message,
+        client: TelegramClient,
+        message: Message,
         directory: str | Path = "media",
-        fname: str | None = None,
-        progress: Callable = None,
-        progress_args: tuple = (),
         max_file_size: int = 0
-) -> tuple[Path, str]:
+) -> tuple[Path | None, str]:
     """
     Download media into a renamed file
 
     :return: Renamed file path, original file name
     """
-    file_name, file_id_obj = get_file_name(client, message)
+    file_name = get_file_name(message)
     renamed = str(message.id) + Path(file_name).suffix
-    return await download_media(client, message, directory, renamed, progress, progress_args, max_file_size), file_name
+    return await download_media(client, message, directory, renamed, max_file_size), file_name

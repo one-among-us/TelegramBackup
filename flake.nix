@@ -29,7 +29,7 @@
             propagatedBuildInputs = (with python3Packages;
               [ setuptools
                 toml
-                pyrogram
+                telethon
                 tgcrypto
                 uvloop
                 requests
