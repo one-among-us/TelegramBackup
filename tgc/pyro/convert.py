@@ -15,7 +15,7 @@ def convert_media_dict(msg: Message) -> dict:
                 return dict(vars(dct))
         return {}
 
-    d = deep_dict(helper(), {'_client'})
+    d = deep_dict(helper(), {'_client', 'raw'})
     if d:
         d['media_type'] = MEDIA_TYPE_MAP.get(msg.media)
         if msg.has_media_spoiler:

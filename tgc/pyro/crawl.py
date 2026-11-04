@@ -129,7 +129,7 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
             # Read image size
             img['width'], img['height'] = Image.open(path / img['url']).size
 
-    return remove_keys(remove_nones(m), {'file_id', 'file_unique_id'})
+    return remove_keys(remove_nones(m), {'file_id', 'file_unique_id', 'raw'})
 
 
 async def download_custom_emojis(msgs: list[Message], results: list[dict], path: Path):
