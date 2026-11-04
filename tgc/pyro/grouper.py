@@ -1,13 +1,15 @@
+from pathlib import Path
 from hypy_utils.dict_utils import remove_nones
 
 
-def group_msgs(msgs: list[dict]) -> list[dict]:
+def group_msgs(msgs: list[dict], lookup_posts: list[dict] | None = None) -> list[dict]:
     """
     Merge message files into groups
 
     Conditions: Messages will be sorted by increasing ID (with the oldest message on top)
 
     :param msgs: Messages
+    :param lookup_posts: Optional existing posts to resolve replies against
     :return: Messages with file groups
     """
     # Sort messages
@@ -46,18 +48,44 @@ def group_msgs(msgs: list[dict]) -> list[dict]:
         if not m['images']:
             del m['images']
 
+    # Build external lookup map for older posts
+    ext_lookup: dict[int, dict] = {}
+    for p in (lookup_posts or []):
+        ext_lookup[p['id']] = p
+        for item in (p.get('images') or []) + (p.get('files') or []):
+            stem = Path(item.get('url', '')).stem
+            if stem.isdigit():
+                ext_lookup[int(stem)] = p
+
     # Change all reply references
     for m in msgs:
         if 'reply_id' not in m:
             continue
         rid = m.pop('reply_id')
-        rm = reply_map.get(rid) or id_map[rid]
+        rm = reply_map.get(rid) or id_map.get(rid) or ext_lookup.get(rid)
 
-        m['reply'] = {
-            'id': rm['id'],
-            'text': rm.get('text'),
-            'thumb': ((rm.get('files') or rm.get('images') or [None])[0] or {}).get('thumb')
-        }
+        if rm:
+            thumb = None
+            if rm.get('files'):
+                thumb = rm['files'][0].get('thumb')
+            elif rm.get('images'):
+                thumb = rm['images'][0].get('thumb')
+            elif rm.get('file'):
+                thumb = rm['file'].get('thumb')
+            elif rm.get('image'):
+                thumb = rm['image'].get('thumb')
+            elif isinstance(rm.get('reply'), dict):
+                thumb = rm['reply'].get('thumb')
+
+            m['reply'] = {
+                'id': rm['id'],
+                'text': rm.get('text'),
+                'thumb': thumb
+            }
+        else:
+            m['reply'] = {
+                'id': rid
+            }
 
     # Add non-grouped messages to results
     grouped_ids = {m['id'] for v in groups.values() for m in v}

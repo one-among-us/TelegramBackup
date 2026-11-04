@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 from pathlib import Path
 
 from PIL import Image
@@ -42,6 +43,35 @@ def get_user_name(user: User) -> str:
     return name
 
 
+def get_forward_info(msg: Message) -> dict | None:
+    origin = getattr(msg, "forward_origin", None)
+    if origin is not None:
+        sender_user = getattr(origin, "sender_user", None)
+        if sender_user:
+            return {
+                "name": get_user_name(sender_user),
+                "url": f'https://t.me/{sender_user.username}' if sender_user.username else None,
+            }
+        chat = getattr(origin, "chat", getattr(origin, "sender_chat", None))
+        if chat:
+            return {"name": chat.title}
+        sender_name = getattr(origin, "sender_user_name", None)
+        if sender_name:
+            return {"name": sender_name}
+        return None
+
+    if getattr(msg, "forward_from", None):
+        return {
+            "name": get_user_name(msg.forward_from),
+            "url": f'https://t.me/{msg.forward_from.username}' if msg.forward_from.username else None,
+        }
+    if getattr(msg, "forward_from_chat", None):
+        return {"name": msg.forward_from_chat.title}
+    if getattr(msg, "forward_sender_name", None):
+        return {"name": msg.forward_sender_name}
+    return None
+
+
 async def process_message(msg: Message, path: Path, export: dict) -> dict:
     media_path = path / "media"
 
@@ -53,14 +83,7 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
         "author": msg.author_signature,
         "views": msg.views,
         "forwards": msg.forwards,
-        "forwarded_from": {
-            "name": get_user_name(msg.forward_from),
-            "url": f'https://t.me/{msg.forward_from.username}' if msg.forward_from.username else None,
-        } if msg.forward_from else {
-            "name": msg.forward_from_chat.title,
-        } if msg.forward_from_chat else {
-            "name": msg.forward_sender_name,
-        } if msg.forward_sender_name else None,
+        "forwarded_from": get_forward_info(msg),
         "media_group_id": msg.media_group_id,
         "reply_id": msg.reply_to_message_id,
         "file": convert_media_dict(msg)
@@ -133,48 +156,107 @@ async def download_custom_emojis(msgs: list[Message], results: list[dict], path:
                                               f'<i class="custom-emoji" emoji-src="{op}">')
 
 
-async def process_chat(chat_id: int, path: Path, export: dict):
+def get_post_ids(p: dict) -> set[int]:
+    """
+    Get all message IDs associated with a post (including media group items)
+    """
+    ids = {p['id']}
+    for item in (p.get('images') or []) + (p.get('files') or []):
+        url = item.get('url', '')
+        stem = Path(url).stem
+        if stem.isdigit():
+            ids.add(int(stem))
+    return ids
+
+
+async def process_chat(chat_id: int, path: Path, export: dict, full: bool = False, overlap: int | None = None):
     chat: Chat = await app.get_chat(chat_id)
     printc(f"&aChat obtained. Chat name: {chat.title} | Type: {chat.type} | ID: {chat.id}")
 
-    # Crawl 200 messages each request
-    print("Crawling channel posts...")
-    msgs = []
-    for i in range(999):
-        start_idx = i * 200 + 1
-        end_idx = start_idx + 200
+    is_full = full or export.get('full', False)
+    overlap_count = overlap if overlap is not None else export.get('overlap', 20)
 
-        additional_msgs = await app.get_messages(chat.id, range(start_idx, end_idx))
+    existing_posts: list[dict] = []
+    posts_file = path / "posts.json"
+    if not is_full and posts_file.is_file():
+        try:
+            with open(posts_file, "r", encoding="utf-8") as f:
+                existing_posts = json.load(f)
+        except Exception as e:
+            print(f"Warning: Failed to load existing {posts_file} ({e}), performing full crawl...")
+            existing_posts = []
+
+    preserved_posts: list[dict] = []
+    if existing_posts:
+        # Determine overlap cutoff point
+        idx = max(0, len(existing_posts) - overlap_count)
+        # Avoid splitting a media group across preserved and target posts
+        while idx > 0 and existing_posts[idx].get('media_group_id') and existing_posts[idx]['media_group_id'] == existing_posts[idx - 1].get('media_group_id'):
+            idx -= 1
+
+        preserved_posts = existing_posts[:idx]
+        target_posts = existing_posts[idx:]
+        start_idx = min(min(get_post_ids(p)) for p in target_posts)
+        printc(f"&bIncremental crawl mode: Preserving {len(preserved_posts)} older posts, re-checking from post ID #{start_idx} (overlap: {len(target_posts)} posts)")
+    else:
+        start_idx = 1
+        if is_full:
+            printc("&eFull crawl mode: crawling from message ID #1...")
+        else:
+            printc("&eNo existing posts found: starting initial crawl from message ID #1...")
+
+    # Crawl 200 messages each request
+    print(f"Crawling channel posts (starting from ID #{start_idx})...")
+    msgs = []
+    curr_idx = start_idx
+    batch_size = 200
+
+    while True:
+        end_idx = curr_idx + batch_size
+        additional_msgs = await app.get_messages(chat.id, range(curr_idx, end_idx))
         additional_msgs = [m for m in additional_msgs if not m.empty]
         msgs += additional_msgs
         print(f"> {len(msgs)} total messages... (up to ID #{end_idx - 1})")
 
         if not additional_msgs:
-            print("> All 200 messages are empty, we're done.")
+            print("> All messages in batch are empty, we're done.")
             break
 
-    # print(msgs)
+        # In incremental mode, if the batch messages stopped well before the end of the batch,
+        # we have reached the end of the channel and can stop early without waiting for another empty batch.
+        max_batch_id = max(m.id for m in additional_msgs)
+        if not is_full and (end_idx - 1) - max_batch_id > 20:
+            print(f"> Reached end of channel (last message ID: #{max_batch_id}).")
+            break
+
+        curr_idx = end_idx
+
     results = [await process_message(m, path, export) for m in msgs]
     await download_custom_emojis(msgs, results, path)
 
-    # Group messages
-    results = group_msgs(results)
+    # Group new messages, resolving replies using preserved posts
+    new_posts = group_msgs(results, lookup_posts=preserved_posts)
 
-    write(path / "posts.json", json_stringify(results, indent=2))
-    write(path / "index.html", HTML.replace("$$POSTS_DATA$$", json_stringify(results)))
+    # Merge preserved posts with new posts
+    new_post_ids = {p['id'] for p in new_posts}
+    final_posts = [p for p in preserved_posts if p['id'] not in new_post_ids] + new_posts
+    final_posts.sort(key=lambda x: x['id'])
+
+    write(path / "posts.json", json_stringify(final_posts, indent=2))
+    write(path / "index.html", HTML.replace("$$POSTS_DATA$$", json_stringify(final_posts)))
 
     if 'rss' in export:
         print("Exporting RSS feed...")
         posts_to_feed(path, FeedMeta(**export['rss']))
 
-    printc(f"&aDone! Saved to {path / 'posts.json'}")
+    printc(f"&aDone! Saved to {path / 'posts.json'} ({len(final_posts)} total posts)")
 
 
-async def run_app():
+async def run_app(full: bool = False, overlap: int | None = None):
     me: User = await app.get_me()
     printc(f"&aLogin success! ID: {me.id} | is_bot: {me.is_bot}")
     for export in cfg.exports:
-        await process_chat(int(export["chat_id"]), Path(export["path"]), export)
+        await process_chat(int(export["chat_id"]), Path(export["path"]), export, full=full, overlap=overlap)
 
 
 cfg: Config
@@ -185,6 +267,8 @@ def run():
     global app, cfg
     parser = argparse.ArgumentParser("Telegram Channel Message to Public API Crawler")
     parser.add_argument("config", help="Config path", nargs="?", default="config.toml")
+    parser.add_argument("--full", action="store_true", help="Perform a full crawl from the beginning instead of incremental")
+    parser.add_argument("--overlap", type=int, default=None, help="Number of recent posts to overlap during incremental crawl (default: 20)")
     args = parser.parse_args()
     cfg = load_config(args.config)
 
@@ -192,4 +276,4 @@ def run():
                  **(dict(bot_token=cfg.bot_token) if cfg.bot_token else {}))
 
     with app:
-        app.loop.run_until_complete(run_app())
+        app.loop.run_until_complete(run_app(full=args.full, overlap=args.overlap))
