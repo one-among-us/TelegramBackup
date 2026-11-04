@@ -29,9 +29,9 @@ dependencies = [
 dynamic = ["version"]
 urls = { Homepage = 'https://github.com/one-among-us/TelegramBackup' }
 
-[tool.setuptools]
-py-modules = ["tgc"]
-packages = ['tgc']
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tgc*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "tgc.__version__"}
