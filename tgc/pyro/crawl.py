@@ -44,8 +44,10 @@ def get_user_name(user: User) -> str:
 
 
 def get_forward_info(msg: Message) -> dict | None:
-    origin = getattr(msg, "forward_origin", None)
-    if origin is not None:
+    if hasattr(msg, "forward_origin"):
+        origin = msg.forward_origin
+        if origin is None:
+            return None
         sender_user = getattr(origin, "sender_user", None)
         if sender_user:
             return {
@@ -213,7 +215,12 @@ async def process_chat(chat_id: int, path: Path, export: dict, full: bool = Fals
 
     while True:
         end_idx = curr_idx + batch_size
-        additional_msgs = await app.get_messages(chat.id, range(curr_idx, end_idx))
+        try:
+            additional_msgs = await app.get_messages(chat.id, range(curr_idx, end_idx), replies=0)
+        except Exception as e:
+            print(f"Error fetching message batch {curr_idx}..{end_idx}: {e}")
+            break
+
         additional_msgs = [m for m in additional_msgs if not m.empty]
         msgs += additional_msgs
         print(f"> {len(msgs)} total messages... (up to ID #{end_idx - 1})")
