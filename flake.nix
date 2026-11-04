@@ -6,14 +6,15 @@
   outputs = { self, nixpkgs, flake-utils }: flake-utils.lib.eachDefaultSystem (system:
     let pkgs = nixpkgs.legacyPackages.${system};
 
-        hypy_utils = { lib, python3Packages, fetchFromGitHub }:
-          python3Packages.buildPythonApplication {
+        hypy_utils = { lib, python3Packages, fetchPypi }:
+          python3Packages.buildPythonPackage rec {
             pname = "hypy_utils";
-            version = "1.0.18";
-            src = fetchFromGitHub { owner = "hykilpikonna";
-                                    repo = "HyPyUtils";
-                                    rev = "332a63479e8e88ba3edafa342e7010e6fac8cf8a";
-                                    sha256 = "sha256-w4dRY2vv6dvtIOCNfIW6AXp4iuvUfNM7RY8Cn6YeTJ0="; };
+            version = "1.0.29";
+            src = fetchPypi {
+              inherit pname version;
+              hash = "sha256-xyIX35PmLxya+VXk+M7Nku9RQoxsc5nvyCTPtB/ZxL0=";
+            };
+            doCheck = false;
             propagatedBuildInputs = with python3Packages; [ setuptools tqdm numpy matplotlib numba requests ];
             meta = { description = "HyDEV Utils for Python | Mostly for personal use";
                      homepage = "https://github.com/hykilpikonna/HyPyUtils";

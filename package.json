@@ -2,5 +2,11 @@
   "dependencies": {
     "puppeteer-lottie": "^1.1.2",
     "puppeteer-lottie-cli": "^1.0.9"
+  },
+  "resolutions": {
+    "puppeteer": "^25.16.0",
+    "cross-spawn": "^7.0.6",
+    "semver": "^7.8.6",
+    "sprintf-js": "^1.1.3"
   }
 }

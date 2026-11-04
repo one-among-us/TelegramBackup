@@ -192,4 +192,4 @@ def run():
                  **(dict(bot_token=cfg.bot_token) if cfg.bot_token else {}))
 
     with app:
-        asyncio.get_event_loop().run_until_complete(run_app())
+        app.loop.run_until_complete(run_app())
