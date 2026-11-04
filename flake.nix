@@ -19,6 +19,27 @@
                      homepage = "https://github.com/hykilpikonna/HyPyUtils";
                      license = lib.licenses.mit; }; };
 
+        kurigram = { lib, python3Packages, fetchPypi }:
+          python3Packages.buildPythonPackage rec {
+            pname = "kurigram";
+            version = "2.2.26";
+            src = fetchPypi {
+              inherit pname version;
+              hash = "sha256-g7ZP16s3Ei2SCx58DiIbWZ18Ut1dDSTHmVbwEnMCDEk=";
+            };
+            doCheck = false;
+            propagatedBuildInputs = with python3Packages; [
+              pyaes
+              python-socks
+              tgcrypto
+            ];
+            meta = {
+              description = "Telegram MTProto API Client Library for Python";
+              homepage = "https://github.com/kurigram-org/kurigram";
+              license = lib.licenses.lgpl3Plus;
+            };
+          };
+
         tgcDrv = { lib, pkgs, python3Packages }:
           python3Packages.buildPythonPackage {
             pname = "tgc";
@@ -29,7 +50,6 @@
             propagatedBuildInputs = (with python3Packages;
               [ setuptools
                 toml
-                pyrogram
                 tgcrypto
                 uvloop
                 requests
@@ -37,7 +57,8 @@
                 feedgen
                 markdown
                 importlib-metadata ])
-            ++ [ (pkgs.callPackage hypy_utils {}) ];
+            ++ [ (pkgs.callPackage hypy_utils {})
+                 (pkgs.callPackage kurigram {}) ];
             preInstall = ''
               # Move the submodules
               mkdir -p $out/${python3Packages.python.sitePackages}

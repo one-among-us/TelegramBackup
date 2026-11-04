@@ -17,7 +17,7 @@ classifiers = [
 ]
 dependencies = [
     "toml~=0.10.2",
-    "pyrogram~=2.0.100",
+    "kurigram~=2.2.26",
     "tgcrypto~=1.2.5",
     "requests~=2.28.2",
     "hypy_utils>=1.0.17",
