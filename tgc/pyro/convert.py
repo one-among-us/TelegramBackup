@@ -8,8 +8,9 @@ from tgc.pyro.consts import MEDIA_TYPE_MAP
 
 def convert_media_dict(msg: Message) -> dict:
     def helper():
-        for f in ['photo', 'video', 'audio', 'voice', 'document', 'sticker', 'animation', 'video_note', 'contact',
-                  'location', 'venue', 'poll', 'web_page']:
+        for f in ['photo', 'live_photo', 'video', 'audio', 'voice', 'document', 'sticker', 'animation', 'video_note',
+                  'contact', 'location', 'venue', 'poll', 'web_page',
+                  'dice', 'game', 'story', 'giveaway', 'giveaway_winners', 'invoice', 'paid_media', 'checklist']:
             dct = getattr(msg, f, None)
             if dct:
                 return dict(vars(dct))
@@ -17,12 +18,12 @@ def convert_media_dict(msg: Message) -> dict:
 
     d = deep_dict(helper(), {'_client', 'raw'})
     if d:
-        d['media_type'] = MEDIA_TYPE_MAP.get(msg.media)
-        if msg.has_media_spoiler:
+        d['media_type'] = MEDIA_TYPE_MAP.get(getattr(msg, 'media', None))
+        if getattr(msg, 'has_media_spoiler', False):
             d['spoiler'] = True
 
     # Move location to one place
-    if msg.venue:
+    if getattr(msg, 'venue', None):
         d.pop('location', None)
         if msg.venue.location:
             d['longitude'] = msg.venue.location.longitude
@@ -48,6 +49,8 @@ def entity_start_end(text: str, en: MessageEntity) -> tuple[str, str] | None:
         case MessageEntityType.BOLD:
             return "<b>", "</b>"
         case MessageEntityType.BLOCKQUOTE:
+            if getattr(en, "expandable", False):
+                return '<blockquote expandable class="expandable">', '</blockquote>'
             return "<blockquote>", "</blockquote>"
         case MessageEntityType.SPOILER:
             return '<span class="spoiler"><span>', '</span></span>'
@@ -57,22 +60,40 @@ def entity_start_end(text: str, en: MessageEntity) -> tuple[str, str] | None:
             return f'<a href="{text}">', '</a>'
         case MessageEntityType.HASHTAG:
             return f'<a href="#{text}">', '</a>'
+        case MessageEntityType.CASHTAG:
+            return f'<a href="https://t.me/share/url?url={text}">', '</a>'
         case MessageEntityType.MENTION:
             return f'<a href="https://t.me/{text.strip("@")}">', '</a>'
         case MessageEntityType.CUSTOM_EMOJI:
             # This will be replaced later
             return f'<i class="custom-emoji" emoji-src="emoji/{en.custom_emoji_id}">', '</i>'
+        case MessageEntityType.BOT_COMMAND:
+            return "<code>", "</code>"
+        case MessageEntityType.EMAIL:
+            return f'<a href="mailto:{text}">', '</a>'
+        case MessageEntityType.PHONE_NUMBER:
+            return f'<a href="tel:{text}">', '</a>'
+        case MessageEntityType.BANK_CARD:
+            return "<code>", "</code>"
         case MessageEntityType.PRE:
             lang = en.language
             return f'<pre language="{lang}">' if lang else f"<pre>", f"</pre>"
         case _:
+            # Check expandable blockquote if supported by runtime
+            if getattr(MessageEntityType, 'EXPANDABLE_BLOCKQUOTE', None) and en.type == MessageEntityType.EXPANDABLE_BLOCKQUOTE:
+                return '<blockquote expandable class="expandable">', '</blockquote>'
             return None
 
 
-def convert_text(text: str, entities: list[MessageEntity]) -> str:
+def convert_text(text: str, entities: list[MessageEntity] | None) -> str:
     """
     Convert text to HTML
     """
+    if not text:
+        return ""
+    if not entities:
+        return text
+
     text = utils.add_surrogates(text)
 
     entities_offsets = []

@@ -17,10 +17,13 @@ from .download_media import download_media, has_media, guess_ext, download_media
 from .grouper import group_msgs
 from ..convert_export import remove_nones
 from ..convert_media_types import tgs_to_apng
+from ..dice_helper import download_dice_animation
+from ..image_opt import create_webp_thumbnail, optimize_post_images
+from ..rich_message import rich_blocks_to_html
 from ..rss.posts_to_feed import posts_to_feed, FeedMeta
 
 
-def effective_text(msg: Message) -> str:
+def effective_text(msg: Message) -> str | None:
     """
     Get effective text of a message in HTML
     """
@@ -28,8 +31,30 @@ def effective_text(msg: Message) -> str:
         return convert_text(msg.text, msg.text.entities)
     if msg.caption:
         return convert_text(msg.caption, msg.caption.entities)
-    if msg.service:
+    if getattr(msg, 'dice', None):
+        return None
+    if getattr(msg, 'poll', None):
+        q = msg.poll.question
+        if hasattr(q, 'text'):
+            entities = getattr(q, 'entities', None) or getattr(msg.poll, 'question_entities', None)
+            return convert_text(q.text, entities)
+        entities = getattr(msg.poll, 'question_entities', None)
+        return convert_text(str(q), entities)
+    if getattr(msg, 'game', None):
+        return f"🎮 <b>{msg.game.title}</b>"
+    if getattr(msg, 'giveaway', None):
+        return f"🎁 <b>Giveaway</b>: {msg.giveaway.quantity} prizes"
+    if getattr(msg, 'giveaway_winners', None):
+        return f"🏆 <b>Giveaway Winners</b>: {msg.giveaway_winners.winner_count} winners"
+    if getattr(msg, 'story', None):
+        if getattr(msg.story, 'caption', None):
+            return convert_text(msg.story.caption, getattr(msg.story, 'caption_entities', None))
+        return "📖 <i>Story</i>"
+    if getattr(msg, 'checklist', None):
+        return f"☑️ <b>Checklist</b>: {msg.checklist.title}"
+    if getattr(msg, 'service', None):
         return str(msg.service).split(".")[-1].replace("_", " ").capitalize()
+    return None
 
 
 def _download_media_helper(args: list) -> Path:
@@ -77,6 +102,20 @@ def get_forward_info(msg: Message) -> dict | None:
 async def process_message(msg: Message, path: Path, export: dict) -> dict:
     media_path = path / "media"
 
+    reactions = None
+    if getattr(msg, 'reactions', None) and getattr(msg.reactions, 'reactions', None):
+        reactions = [
+            {"emoji": r.emoji, "custom_emoji_id": r.custom_emoji_id, "count": r.count}
+            for r in msg.reactions.reactions
+        ]
+
+    quote = None
+    if getattr(msg, 'quote', None):
+        quote = {
+            "text": convert_text(msg.quote.text, msg.quote.entities) if msg.quote.text else None,
+            "position": getattr(msg.quote, 'position', None),
+        }
+
     m = {
         "id": msg.id,
         "date": msg.date,
@@ -88,15 +127,41 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
         "forwarded_from": get_forward_info(msg),
         "media_group_id": msg.media_group_id,
         "reply_id": msg.reply_to_message_id,
+        "quote": quote,
+        "reactions": reactions,
+        "show_caption_above_media": msg.show_caption_above_media if getattr(msg, 'show_caption_above_media', None) else None,
+        "has_media_spoiler": msg.has_media_spoiler if getattr(msg, 'has_media_spoiler', None) else None,
         "file": convert_media_dict(msg)
     }
 
     # Download file
     f = m.get('file')
 
+    # Rich message
+    if getattr(msg, 'rich_message', None) and getattr(msg.rich_message, 'blocks', None):
+        rich_html = await rich_blocks_to_html(msg.rich_message.blocks, app, msg.id, path, media_path)
+        if rich_html:
+            m['text'] = rich_html
+
+    # Dice animation
+    if getattr(msg, 'dice', None):
+        dice_apng = await download_dice_animation(app, msg.dice.emoji, msg.dice.value, media_path)
+        if dice_apng:
+            if not f:
+                f = m['file'] = {}
+            f['url'] = str(dice_apng.relative_to(path))
+            f['media_type'] = 'dice'
+            f['emoji'] = msg.dice.emoji
+            f['value'] = msg.dice.value
+
     async def dl_media():
-        fp, name = await download_media_urlsafe(app, msg, directory=media_path,
-                                                max_file_size=int((export.get('size_limit_mb') or 0) * 1000_000))
+        try:
+            fp, name = await download_media_urlsafe(app, msg, directory=media_path,
+                                                    max_file_size=int((export.get('size_limit_mb') or 0) * 1000_000))
+        except Exception as e:
+            print(f"Warning: Failed to download media for message #{msg.id}: {e}")
+            return
+
         if fp is None:
             return
         f['original_name'] = name
@@ -110,24 +175,34 @@ async def process_message(msg: Message, path: Path, export: dict) -> dict:
 
         # Download the largest thumbnail
         if f.get('thumbs'):
-            thumb: dict = max(f['thumbs'], key=lambda x: x['file_size'])
-            ext = guess_ext(app, FileId.decode(thumb['file_id']).file_type, None)
-            fp = await download_media(app, thumb['file_id'], directory=media_path,
-                                      fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name)
-            f['thumb'] = str(fp.absolute().relative_to(path.absolute()))
-            del f['thumbs']
+            try:
+                thumb: dict = max(f['thumbs'], key=lambda x: x['file_size'])
+                ext = guess_ext(app, FileId.decode(thumb['file_id']).file_type, None)
+                fp = await download_media(app, thumb['file_id'], directory=media_path,
+                                          fname=fp.with_suffix(fp.suffix + f'_thumb{ext}').name)
+                webp_thumb = create_webp_thumbnail(fp)
+                f['thumb'] = str((webp_thumb or fp).absolute().relative_to(path.absolute()))
+                del f['thumbs']
+            except Exception as e:
+                print(f"Warning: Failed to download thumbnail for message #{msg.id}: {e}")
 
     if has_media(msg):
         await dl_media()
 
     # Move photo to its own key
-    if f:
+    if f and f.get('url'):
         mt = f.get('media_type')
         if mt == 'photo' or (not mt and (f.get('mime_type') or "").startswith("image")):
             img = m['image'] = m.pop('file')
+            full_img_path = path / img['url']
+            if full_img_path.is_file():
+                # Read image size
+                img['width'], img['height'] = Image.open(full_img_path).size
 
-            # Read image size
-            img['width'], img['height'] = Image.open(path / img['url']).size
+                # Create WebP thumbnail
+                thumb_path = create_webp_thumbnail(full_img_path)
+                if thumb_path:
+                    img['thumb'] = str(thumb_path.relative_to(path))
 
     return remove_keys(remove_nones(m), {'file_id', 'file_unique_id', 'raw'})
 
@@ -137,6 +212,14 @@ async def download_custom_emojis(msgs: list[Message], results: list[dict], path:
     # List custom emoji ids
     ids = {e.custom_emoji_id for msg in msgs if msg.text and msg.text.entities for e in msg.text.entities if e.custom_emoji_id}
     ids.update({e.custom_emoji_id for msg in msgs if msg.caption_entities for e in msg.caption_entities if e.custom_emoji_id})
+    ids.update({e.custom_emoji_id for msg in msgs if getattr(msg, 'quote', None) and msg.quote.entities for e in msg.quote.entities if e.custom_emoji_id})
+    ids.update({r.custom_emoji_id for msg in msgs if getattr(msg, 'reactions', None) and getattr(msg.reactions, 'reactions', None) for r in msg.reactions.reactions if r.custom_emoji_id})
+    import re
+    for r in results:
+        for txt in [r.get('text'), (r.get('quote') or {}).get('text')]:
+            if txt and isinstance(txt, str):
+                for match in re.findall(r'emoji/(\d+)', txt):
+                    ids.add(int(match))
     ids = list(ids)
     orig_ids = list(ids)
 
@@ -153,9 +236,12 @@ async def download_custom_emojis(msgs: list[Message], results: list[dict], path:
 
         # Replace sticker paths
         for r in results:
-            if "text" in r:
+            if "text" in r and isinstance(r['text'], str):
                 r['text'] = r['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">',
                                               f'<i class="custom-emoji" emoji-src="{op}">')
+            if "quote" in r and isinstance(r.get("quote"), dict) and isinstance(r["quote"].get("text"), str):
+                r['quote']['text'] = r['quote']['text'].replace(f'<i class="custom-emoji" emoji-src="emoji/{id}">',
+                                                                f'<i class="custom-emoji" emoji-src="{op}">')
 
 
 def get_post_ids(p: dict) -> set[int]:
@@ -248,6 +334,8 @@ async def process_chat(chat_id: int, path: Path, export: dict, full: bool = Fals
     new_post_ids = {p['id'] for p in new_posts}
     final_posts = [p for p in preserved_posts if p['id'] not in new_post_ids] + new_posts
     final_posts.sort(key=lambda x: x['id'])
+
+    optimize_post_images(final_posts, path)
 
     write(path / "posts.json", json_stringify(final_posts, indent=2))
     write(path / "index.html", HTML.replace("$$POSTS_DATA$$", json_stringify(final_posts)))

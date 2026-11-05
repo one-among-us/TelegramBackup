@@ -47,16 +47,21 @@ def tgs_to_apng(tgs: str | Path) -> Path:
     if not out.is_file():
         # Decompress to json
         json = tgs.with_suffix(".json")
-        json.write_bytes(zlib.decompress(tgs.read_bytes(), 15 + 32))
+        try:
+            json.write_bytes(zlib.decompress(tgs.read_bytes(), 15 + 32))
 
-        # Convert json to apng
-        lottie = find_node_bin("puppeteer-lottie", "puppeteer-lottie-cli")
-        if lottie is None:
+            # Convert json to apng
+            lottie = find_node_bin("puppeteer-lottie", "puppeteer-lottie-cli")
+            if lottie is None:
+                return tgs
+            check_call([lottie, '-i', json, '-o', out])
+        except Exception as e:
+            print(f"Warning: Failed to convert {tgs} to apng ({e}), keeping original")
             return tgs
-        check_call([lottie, '-i', json, '-o', out])
-
-        # Delete json
-        os.remove(json)
+        finally:
+            # Delete json
+            if json.is_file():
+                os.remove(json)
 
     return out
 
