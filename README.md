@@ -74,7 +74,7 @@ After all setup is complete, you can proceed to running the crawler.
 
 #### Running the Crawler
 
-Simply run the `tgc` command.
+Simply run the `tgc` command. By default, it runs an incremental crawl preserving older posts. Use `--full` to perform a full re-crawl, or `--overlap <n>` to set the overlap window.
 
 ## Additional Config
 
@@ -83,6 +83,8 @@ You can set additional configuration for each export entry like below:
 | Field           | Description                                   | Type  |
 |-----------------|-----------------------------------------------|-------|
 | `size_limit_mb` | Limit downloaded file size (skip large files) | float |
+| `full`          | Perform full crawl instead of incremental     | bool  |
+| `overlap`       | Number of recent posts to recheck in incremental crawl (default: 20) | int |
 
 ### RSS Feed Generation
 
