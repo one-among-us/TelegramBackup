@@ -71,8 +71,12 @@ async def rich_blocks_to_html(blocks: list, app: Client, msg_id: int, base_path:
             size = getattr(b, "size", 1)
             tag = "h2" if size == 1 else "h3"
             html_parts.append(f"<{tag}>{rich_text_to_html(b.text)}</{tag}>")
-        elif cls_name in ("RichBlockBlockQuotation", "RichBlockPullQuotation"):
-            cls_attr = ' class="pullquote"' if cls_name == "RichBlockPullQuotation" else ""
+        elif cls_name in ("RichBlockBlockQuotation", "RichBlockPullQuotation", "RichBlockExpandableBlockQuotation"):
+            cls_attr = ""
+            if cls_name == "RichBlockPullQuotation":
+                cls_attr = ' class="pullquote"'
+            elif cls_name == "RichBlockExpandableBlockQuotation":
+                cls_attr = ' class="expandable" expandable'
             if hasattr(b, "blocks") and b.blocks:
                 t = await rich_blocks_to_html(b.blocks, app, msg_id, base_path, media_path)
             else:
@@ -109,6 +113,19 @@ async def rich_blocks_to_html(blocks: list, app: Client, msg_id: int, base_path:
             html_parts.append(f"<pre{attr}><code>{rich_text_to_html(b.text)}</code></pre>")
         elif cls_name == "RichBlockFooter":
             html_parts.append(f'<footer class="rich-footer">{rich_text_to_html(b.text)}</footer>')
+        elif cls_name == "RichBlockButtons":
+            btns = []
+            align = getattr(b, "align", "left") or "left"
+            for btn in getattr(b, "buttons", []):
+                btn_text = rich_text_to_html(getattr(btn, "text", "Button"))
+                url = getattr(btn, "url", getattr(btn, "copy_text", "#"))
+                if hasattr(url, "text"):
+                    url = url.text
+                style_name = str(getattr(btn, "style", "")).split(".")[-1].lower()
+                btns.append(f'<a class="rich-button {style_name}" href="{html.escape(str(url))}">{btn_text}</a>')
+            html_parts.append(f'<div class="rich-button-row align-{align}">{"".join(btns)}</div>')
+        elif cls_name == "RichBlockThinking":
+            html_parts.append(f'<div class="rich-thinking">{rich_text_to_html(getattr(b, "text", ""))}</div>')
         elif cls_name == "RichBlockTable":
             cap = f"<caption>{rich_text_to_html(b.caption)}</caption>" if getattr(b, "caption", None) else ""
             rows = []
