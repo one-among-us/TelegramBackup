@@ -11,13 +11,28 @@ from pyrogram.types import User, Chat, Message, Sticker
 from pyrogram import utils
 
 def get_peer_type_new(peer_id: int) -> str:
-    peer_id_str = str(peer_id)
-    if not peer_id_str.startswith("-"):
+    # Telegram Bot API dialog ID ranges:
+    # https://blogfork.telegram.org/api/bots/ids
+
+    # User IDs: 1 to 0xFFFFFFFFFF
+    if 1 <= peer_id <= 0xFFFFFFFFFF:
         return "user"
-    elif peer_id_str.startswith("-100"):
-        return "channel"
-    else:
+
+    # Basic group IDs: -1 to -999999999999
+    if -999999999999 <= peer_id <= -1:
         return "chat"
+
+    # Supergroup / Channel IDs:
+    # -1000000000001 to -1997852516352
+    if -1997852516352 <= peer_id <= -1000000000001:
+        return "channel"
+
+    # Monoforum IDs: -2002147483649 to -4000000000000
+    # Monoforums are also represented by Channel constructors.
+    if -4000000000000 <= peer_id <= -2002147483649:
+        return "channel"
+
+    raise ValueError(f"Peer id invalid: {peer_id}")
 
 utils.get_peer_type = get_peer_type_new
 
