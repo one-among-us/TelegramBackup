@@ -58,6 +58,30 @@ class TestIncremental(unittest.TestCase):
         self.assertEqual(final[1]["text"], "Updated 2")
         self.assertEqual(final[2]["text"], "New 3")
 
+    def test_run_async_context(self):
+        from unittest.mock import patch, MagicMock, AsyncMock
+        from tgc.pyro import crawl
+        from tgc.pyro.config import Config
+
+        mock_client = MagicMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        # Ensure client has no .loop attribute (as in kurigram 2.2.27)
+        if hasattr(mock_client, 'loop'):
+            del mock_client.loop
+
+        dummy_cfg = Config(api_id=123, api_hash="abc", bot_token="token", exports=[])
+
+        with patch("tgc.pyro.crawl.load_config", return_value=dummy_cfg), \
+             patch("tgc.pyro.crawl.Client", return_value=mock_client), \
+             patch("tgc.pyro.crawl.run_app", new_callable=AsyncMock) as mock_run_app, \
+             patch("sys.argv", ["tgc", "--full"]):
+            crawl.run()
+
+            mock_client.__aenter__.assert_awaited_once()
+            mock_run_app.assert_awaited_once_with(full=True, overlap=None)
+            mock_client.__aexit__.assert_awaited_once()
+
 
 if __name__ == "__main__":
     unittest.main()

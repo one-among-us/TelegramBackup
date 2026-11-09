@@ -57,10 +57,6 @@ def effective_text(msg: Message) -> str | None:
     return None
 
 
-def _download_media_helper(args: list) -> Path:
-    return asyncio.run(download_media(app, *args))
-
-
 def get_user_name(user: User) -> str:
     name = user.first_name or ""
     if user.last_name:
@@ -370,5 +366,8 @@ def run():
     app = Client("Bot", cfg.api_id or 2048, cfg.api_hash or "b18441a1ff607e10a989891a5462e627",
                  **(dict(bot_token=cfg.bot_token) if cfg.bot_token else {}))
 
-    with app:
-        app.loop.run_until_complete(run_app(full=args.full, overlap=args.overlap))
+    async def main():
+        async with app:
+            await run_app(full=args.full, overlap=args.overlap)
+
+    asyncio.run(main())
